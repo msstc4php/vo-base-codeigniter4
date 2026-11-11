@@ -20,7 +20,7 @@ permissions:
 
 env:
   COMPOSER: composer-ci.json
-  EXTENSIONS: mbstring, xml, ctype, iconv, intl, json, sqlite3
+  EXTENSIONS: mbstring, xml, ctype, iconv, intl, sqlite3
 
 jobs:
   templates:

@@ -50,13 +50,20 @@ The cast handlers are static, so the mapper is built with the core's codecs only
 Int payloads must be canonical digits (`"080"` is rejected), float payloads plain decimals, `DateRange` ISO 8601 with
 an offset. A database column holding a zero-padded number fails loudly on read; that is intended.
 
-## Raw BoundedString on write is a LogicException
+## `InvalidPayloadException` is a `LogicException`
 
-`$entity->fill($request->getPost())` with a raw value for a `BoundedString` field throws `LogicException` (500), not
-a validation-style exception: the field should never be mass-assigned. Build the `BoundedString` in code.
+The core's exceptions extend `InvalidArgumentException`, which PHP derives from `LogicException`. A test expecting
+`LogicException` therefore also passes on `InvalidPayloadException`; tests that mean the client error expect
+`InvalidPayloadException` explicitly.
+
+## Placeholders in rule parameters
+
+CodeIgniter fills `{field}` placeholders in rule parameters from the submitted data
+(`valid_value_object[{type}]` with `type=..\Evil` reaches the rule as `..\Evil`). The FQCN regex in
+`ValueObjectColumn::className()` refuses it before any class lookup; `ValueObjectRulesTest` pins it.
 
 ## Equivalent mutants
 
 The `is_a(ValueObject|BackedEnum)` checks in `targetClass()`/`untrustedTargetClass()` are implied by
 `supports()`/`supportsUntrusted()` and exist for PHPStan narrowing; in the rule, `fromUntrustedPayload()` would refuse
-a `BoundedString` anyway; and the `??=` cache of the mapper.
+a `BoundedString` anyway; and the `??=` caches (mapper, checked class per parameter), which only save work.

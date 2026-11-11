@@ -21,6 +21,7 @@ use MSSTC4PHP\ValueObject\Identity\EmailAddress;
 use MSSTC4PHP\ValueObject\Network\Port;
 use MSSTC4PHP\ValueObject\Primitive\BoundedString;
 use MSSTC4PHP\ValueObject\Primitive\IntRange;
+use MSSTC4PHP\ValueObject\Temporal\DateRange;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -151,15 +152,21 @@ final class ValueObjectColumnTest extends TestCase
     public function testMalformedJsonForACompositeIsAPayloadError(): void
     {
         $this->expectException(InvalidPayloadException::class);
-        $this->expectExceptionMessage('must be an array, string given');
+        $this->expectExceptionMessage('A ' . IntRange::class . ' payload must be JSON text: Syntax error');
 
-        ValueObjectColumn::fromStorage('{"min":1,', IntRange::class);
+        try {
+            ValueObjectColumn::fromStorage('{"min":1,', IntRange::class);
+        } catch (InvalidPayloadException $e) {
+            self::assertInstanceOf(JsonException::class, $e->getPrevious());
+
+            throw $e;
+        }
     }
 
     public function testJsonScalarForACompositeIsAPayloadError(): void
     {
         $this->expectException(InvalidPayloadException::class);
-        $this->expectExceptionMessage('must be an array, string given');
+        $this->expectExceptionMessage('must be an array, int given');
 
         ValueObjectColumn::fromStorage('5', IntRange::class);
     }
@@ -219,14 +226,13 @@ final class ValueObjectColumnTest extends TestCase
     {
         yield 'array' => [['value' => 'x', 'minLength' => 0, 'maxLength' => null]];
         yield 'JSON' => ['{"value":"x","minLength":0,"maxLength":null}'];
-        yield 'plain string' => ['x'];
     }
 
     #[DataProvider('rawBoundedStrings')]
     public function testABoundedStringIsOnlyWrittenFromAnInstance(mixed $raw): void
     {
-        $this->expectException(LogicException::class);
-        $this->expectExceptionMessage(BoundedString::class . ' cannot be read from untrusted input');
+        $this->expectException(InvalidPayloadException::class);
+        $this->expectExceptionMessage('A ' . BoundedString::class . ' cannot be read from untrusted input');
 
         ValueObjectColumn::toStorage($raw, BoundedString::class);
     }
@@ -257,9 +263,71 @@ final class ValueObjectColumnTest extends TestCase
 
     public function testInputNeverBuildsABoundedString(): void
     {
-        $this->expectException(LogicException::class);
+        $this->expectException(InvalidPayloadException::class);
 
         ValueObjectColumn::fromInput('{"value":"x","minLength":0,"maxLength":null}', BoundedString::class);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function notClassNames(): iterable
+    {
+        yield 'placeholder' => ['{field}'];
+        yield 'path' => ['../App/Foo'];
+        yield 'trailing backslash' => ['App\\'];
+        yield 'double backslash' => ['App\\\\Foo'];
+        yield 'leading digit' => ['1App'];
+        yield 'newline' => ["App\\Foo\n"];
+        yield 'space' => ['App Foo'];
+    }
+
+    #[DataProvider('notClassNames')]
+    public function testAParameterThatIsNotAClassNameNeverReachesTheAutoloader(string $parameter): void
+    {
+        $autoloaded = [];
+        $probe = static function (string $class) use (&$autoloaded): void {
+            $autoloaded[] = $class;
+        };
+        spl_autoload_register($probe);
+
+        try {
+            ValueObjectColumn::untrustedTargetClass($parameter);
+            self::fail('A LogicException was expected.');
+        } catch (LogicException $e) {
+            self::assertStringContainsString('parameter "', $e->getMessage());
+            self::assertStringContainsString('" is not a class name.', $e->getMessage());
+        } finally {
+            spl_autoload_unregister($probe);
+        }
+
+        self::assertSame([], $autoloaded);
+    }
+
+    public function testAnInvalidCastParameterIsRefusedToo(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('The value-object cast parameter "{x}" is not a class name.');
+
+        ValueObjectColumn::targetClass(['{x}']);
+    }
+
+    public function testACheckedClassIsCachedPerParameter(): void
+    {
+        self::assertSame(Port::class, ValueObjectColumn::targetClass(['\\' . Port::class]));
+        self::assertSame(Port::class, ValueObjectColumn::targetClass(['\\' . Port::class]));
+        self::assertSame(Port::class, ValueObjectColumn::untrustedTargetClass(Port::class));
+        self::assertSame(Port::class, ValueObjectColumn::untrustedTargetClass(Port::class));
+    }
+
+    public function testADateRangeRoundTrips(): void
+    {
+        $range = new DateRange(new DateTimeImmutable('2026-11-01T00:00:00.000000+00:00'), new DateTimeImmutable('2026-11-30T23:59:59.500000+02:00'));
+        $stored = ValueObjectColumn::toStorage($range, DateRange::class);
+
+        self::assertIsString($stored);
+        self::assertEquals($range, ValueObjectColumn::fromStorage($stored, DateRange::class));
+        self::assertEquals($range, ValueObjectColumn::fromInput($stored, DateRange::class));
     }
 
     public function testToStorageValidatesRawInput(): void

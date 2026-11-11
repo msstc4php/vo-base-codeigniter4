@@ -113,7 +113,7 @@ final class ModelRoundTripTest extends TestCase
         self::assertEquals(Port::from(8080), $found->port);
         self::assertEquals(new IntRange(2, 3), $found->range);
 
-        $found->email = 'c@example.com';
+        $found->fill(['email' => 'c@example.com']);
         $model->save($found);
 
         self::assertSame('c@example.com', $this->rows()[0]['email']);

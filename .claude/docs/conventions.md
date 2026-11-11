@@ -4,8 +4,8 @@
 - **`@param mixed $value` on both `set()`s**: the generic `BaseCast<TPhpNativeValue, ...>` would type the input as the
   value object, but CI hands raw form/row input to `set()` and we accept it on purpose.
 - **Exceptions**: invalid content -> the value object's exception; wrong type/shape, bad JSON
-  -> `InvalidPayloadException`; raw (non-instance) `BoundedString` input on write -> `LogicException` from the
-  core's `fromUntrustedPayload()`; configuration errors (missing/unsupported class, extra param, `BoundedString` in
+  -> `InvalidPayloadException`; raw (non-instance) `BoundedString` input on write -> `InvalidPayloadException` from
+  the core's `fromUntrustedPayload()`; configuration errors (including a parameter that is not a class name) (missing/unsupported class, extra param, `BoundedString` in
   the rule) -> `LogicException`. Validation returns `false` only for `InvalidValueObjectException`.
 - **No hard-coded class checks**: which classes input may build is the core's `supportsUntrusted()` decision.
 - **JSON flags**: plain `JSON_THROW_ON_ERROR`, same as the Doctrine ORM types, so bytes match across bridges.

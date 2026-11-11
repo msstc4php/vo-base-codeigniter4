@@ -23,7 +23,19 @@ final class ValueObjectColumn
 {
     private const string NULLABLE_MARKER = 'nullable';
 
+    private const string CLASS_NAME = '/^\\\\?[A-Za-z_][A-Za-z0-9_]*(?:\\\\[A-Za-z_][A-Za-z0-9_]*)*$/D';
+
     private static ?ValueObjectMapper $mapper = null;
+
+    /**
+     * @var array<string, class-string<ValueObject|BackedEnum>>
+     */
+    private static array $castClasses = [];
+
+    /**
+     * @var array<string, class-string<ValueObject|BackedEnum>>
+     */
+    private static array $inputClasses = [];
 
     private function __construct()
     {
@@ -43,12 +55,9 @@ final class ValueObjectColumn
             throw new LogicException(\sprintf('The value-object cast takes one class parameter, "%s" given in addition.', implode(', ', $extra)));
         }
 
-        $class = self::className($params[0] ?? '', 'cast');
-        if (!self::mapper()->supports($class) || !is_a($class, ValueObject::class, true) && !is_a($class, BackedEnum::class, true)) {
-            throw new LogicException(\sprintf('%s is not a value object the cast supports: it must be scalar-backed, a backed enum or a composite with a payload codec.', $class));
-        }
+        $parameter = $params[0] ?? '';
 
-        return $class;
+        return self::$castClasses[$parameter] ??= self::checkedCastClass($parameter);
     }
 
     /**
@@ -56,14 +65,11 @@ final class ValueObjectColumn
      *
      * @throws LogicException when the class is missing, not supported, or may not be built from input (BoundedString)
      */
-    public static function untrustedTargetClass(?string $class): string
+    public static function untrustedTargetClass(?string $parameter): string
     {
-        $class = self::className($class ?? '', 'validation rule');
-        if (!self::mapper()->supportsUntrusted($class) || !is_a($class, ValueObject::class, true) && !is_a($class, BackedEnum::class, true)) {
-            throw new LogicException(\sprintf('%s cannot be validated from input: it is not supported, or its payload carries its own constraints (BoundedString: check the length with min_length/max_length, or use NonEmptyString).', $class));
-        }
+        $parameter ??= '';
 
-        return $class;
+        return self::$inputClasses[$parameter] ??= self::checkedInputClass($parameter);
     }
 
     /**
@@ -79,7 +85,7 @@ final class ValueObjectColumn
      */
     public static function fromStorage(mixed $stored, string $class): ValueObject|BackedEnum
     {
-        return $stored instanceof $class ? $stored : self::read($stored, $class, trusted: true);
+        return $stored instanceof $class ? $stored : self::mapper()->fromPayload($class, self::payloadOf($stored, $class));
     }
 
     /**
@@ -91,12 +97,11 @@ final class ValueObjectColumn
      *
      * @return T
      *
-     * @throws InvalidValueObjectException when $input is not a valid T
-     * @throws LogicException when $class may not be built from untrusted input
+     * @throws InvalidValueObjectException when $input is not a valid T, or $class may not be built from untrusted input
      */
     public static function fromInput(mixed $input, string $class): ValueObject|BackedEnum
     {
-        return $input instanceof $class ? $input : self::read($input, $class, trusted: false);
+        return $input instanceof $class ? $input : self::mapper()->fromUntrustedPayload($class, self::payloadOf($input, $class));
     }
 
     /**
@@ -105,8 +110,8 @@ final class ValueObjectColumn
      *
      * @param class-string<ValueObject|BackedEnum> $class
      *
-     * @throws InvalidValueObjectException when $value is not a valid instance of $class
-     * @throws LogicException when $value is raw input for a class that may not be built from it (BoundedString)
+     * @throws InvalidValueObjectException when $value is not a valid instance of $class, or raw input for a class that
+     *                                     may not be built from it (BoundedString)
      */
     public static function toStorage(mixed $value, string $class): string|int|float
     {
@@ -124,64 +129,62 @@ final class ValueObjectColumn
     }
 
     /**
-     * A composite arrives as JSON text; that is tried only after the raw value failed on its type, so the mapper keeps
-     * every kind decision.
-     *
-     * @template T of ValueObject|BackedEnum
-     *
-     * @param class-string<T> $class
-     *
-     * @return T
+     * @return class-string<ValueObject|BackedEnum>
      */
-    private static function read(mixed $raw, string $class, bool $trusted): ValueObject|BackedEnum
+    private static function checkedCastClass(string $parameter): string
     {
-        try {
-            return self::decode($raw, $class, $trusted);
-        } catch (InvalidPayloadException $wrongType) {
-            if (!\is_string($raw)) {
-                throw $wrongType;
-            }
-
-            try {
-                return self::decode(self::decodeJsonArray($raw), $class, $trusted);
-            } catch (InvalidPayloadException) {
-                throw $wrongType;
-            }
+        $class = self::className($parameter, 'cast');
+        if (!self::mapper()->supports($class) || (!is_a($class, ValueObject::class, true) && !is_a($class, BackedEnum::class, true))) {
+            throw new LogicException(\sprintf('%s is not a value object the cast supports: it must be scalar-backed, a backed enum or a composite with a payload codec.', $class));
         }
+
+        return $class;
     }
 
     /**
-     * @template T of ValueObject|BackedEnum
-     *
-     * @param class-string<T> $class
-     *
-     * @return T
+     * @return class-string<ValueObject|BackedEnum>
      */
-    private static function decode(mixed $payload, string $class, bool $trusted): ValueObject|BackedEnum
+    private static function checkedInputClass(string $parameter): string
     {
-        return $trusted ? self::mapper()->fromPayload($class, $payload) : self::mapper()->fromUntrustedPayload($class, $payload);
+        $class = self::className($parameter, 'validation rule');
+        if (!self::mapper()->supportsUntrusted($class) || (!is_a($class, ValueObject::class, true) && !is_a($class, BackedEnum::class, true))) {
+            throw new LogicException(\sprintf('%s cannot be validated from input: it is not supported, or its payload carries its own constraints (BoundedString: check the length with min_length/max_length, or use NonEmptyString).', $class));
+        }
+
+        return $class;
     }
 
-    private static function className(string $class, string $usage): string
+    /**
+     * Checked before any class lookup, so a parameter built from a placeholder never reaches the autoloader.
+     */
+    private static function className(string $parameter, string $usage): string
     {
+        if ($parameter === '') {
+            throw new LogicException(\sprintf('The value-object %s needs a class parameter.', $usage));
+        }
+
+        if (preg_match(self::CLASS_NAME, $parameter) !== 1) {
+            throw new LogicException(\sprintf('The value-object %s parameter "%s" is not a class name.', $usage, InvalidValueObjectException::excerpt($parameter)));
+        }
+
         // The codec lookup is keyed by the class name as ::class spells it, without a leading backslash.
-        $class = ltrim($class, '\\');
-
-        return $class !== '' ? $class : throw new LogicException(\sprintf('The value-object %s needs a class parameter.', $usage));
+        return ltrim($parameter, '\\');
     }
 
     /**
-     * @return array<array-key, mixed> empty when $json is not a JSON object or array, which no codec accepts
+     * A composite is a JSON text column; anything else goes to the mapper as is.
      */
-    private static function decodeJsonArray(string $json): array
+    private static function payloadOf(mixed $raw, string $class): mixed
     {
-        try {
-            $decoded = json_decode($json, true, flags: \JSON_THROW_ON_ERROR);
-        } catch (JsonException) {
-            return [];
+        if (!\is_string($raw) || !self::mapper()->isComposite($class)) {
+            return $raw;
         }
 
-        return \is_array($decoded) ? $decoded : [];
+        try {
+            return json_decode($raw, true, flags: \JSON_THROW_ON_ERROR);
+        } catch (JsonException $e) {
+            throw new InvalidPayloadException(\sprintf('A %s payload must be JSON text: %s', $class, $e->getMessage()), $e->getCode(), previous: $e);
+        }
     }
 
     private static function mapper(): ValueObjectMapper

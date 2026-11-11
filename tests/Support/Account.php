@@ -19,12 +19,6 @@ use MSSTC4PHP\ValueObject\Primitive\IntRange;
  * @property CurrencyCode|null $currency
  * @property Priority|null $priority
  * @property IntRange|null $range
- * @property EmailAddress|string|null $email
- * @property Port|int|string|null $port
- * @property Latitude|float|string|null $latitude
- * @property CurrencyCode|string|null $currency
- * @property Priority|int|string|null $priority
- * @property IntRange|string|null $range
  */
 final class Account extends Entity
 {

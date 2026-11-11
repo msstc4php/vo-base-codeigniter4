@@ -113,6 +113,17 @@ final class ValueObjectRulesTest extends TestCase
         $validation->run(['email' => 'a@example.com']);
     }
 
+    public function testAPlaceholderInTheParameterCannotReachTheAutoloader(): void
+    {
+        $validation = $this->validation();
+        $validation->setRules(['value' => 'valid_value_object[{type}]', 'type' => 'permit_empty']);
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('The value-object validation rule parameter "..\\\\Evil" is not a class name.');
+
+        $validation->run(['value' => 'x', 'type' => '..\\Evil']);
+    }
+
     public function testAnUnsupportedClassIsAProgrammerError(): void
     {
         $this->expectException(LogicException::class);

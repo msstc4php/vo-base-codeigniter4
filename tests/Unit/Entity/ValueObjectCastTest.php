@@ -94,7 +94,8 @@ final class ValueObjectCastTest extends TestCase
 
     public function testMassAssignmentCannotChooseBoundedStringBounds(): void
     {
-        $this->expectException(LogicException::class);
+        $this->expectException(InvalidPayloadException::class);
+        $this->expectExceptionMessage('cannot be read from untrusted input');
 
         ValueObjectCast::set(['value' => 'x', 'minLength' => 0, 'maxLength' => null], [BoundedString::class]);
     }

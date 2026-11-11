@@ -12,7 +12,8 @@ Entity      DataCaster      Validation
   `ValueObjectMapper::supports()` (casts) or `supportsUntrusted()` (rule), converts stored value <-> value object,
   JSON-encodes composite payloads. Trust boundary: `fromStorage()` (cast `get()`, DB rows) uses `fromPayload()`;
   `fromInput()` (cast `set()` of a raw non-instance value, the validation rule) uses `fromUntrustedPayload()`, which
-  throws `LogicException` for trusted-source-only classes (`BoundedString`: its payload carries its own bounds). Every
+  throws `InvalidPayloadException` for trusted-source-only classes (`BoundedString`: its payload carries its own
+  bounds) and `LogicException` only for unsupported ones. Every
   kind decision is the mapper's; this class only adds the transport (JSON text for array payloads).
 - **`Entity\ValueObjectCast`** and **`DataCaster\ValueObjectCast`**: thin adapters over `Internal` for CodeIgniter's
   two cast interfaces (`CodeIgniter\Entity\Cast\CastInterface` and `CodeIgniter\DataCaster\Cast\CastInterface`).
@@ -29,11 +30,15 @@ mapper into. `ValueObjectColumn` keeps one lazily built `ValueObjectMapper` with
 
 ## Reading a stored value
 
-`read()` (behind both) first hands the raw value to the mapper. Only when that fails with `InvalidPayloadException` (wrong type)
-and the raw value is a string does it try JSON: a decoded array is handed to the mapper again; anything else (bad
-JSON, a JSON scalar) becomes `[]`, which no codec accepts. If the second attempt also fails on type, the *first*
-error is rethrown, so `Port` given `"[1]"` reports "must be an integer, string given", not "array given". This
-avoids re-implementing "is this class a composite?".
+`payloadOf()` JSON-decodes a string only when `ValueObjectMapper::isComposite($class)` says the payload is an array;
+everything else goes to the mapper as is. Bad JSON is an `InvalidPayloadException` with the `JsonException` as
+previous. (Before core 8c795e1 this was try-then-retry; `isComposite()` replaced it.)
+
+## Class checks
+
+`targetClass()` / `untrustedTargetClass()` first match the parameter against an FQCN regex (so nothing that is not a
+class name reaches `is_subclass_of()` and the autoloader), then ask `supports()` / `supportsUntrusted()`. The result
+is cached per parameter string in a static array: casts run on every property read.
 
 ## Writing
 
