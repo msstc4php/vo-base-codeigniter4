@@ -118,6 +118,7 @@ final class ValueObjectCastTest extends TestCase
     public function testAnUnsupportedClassIsAProgrammerError(): void
     {
         $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('stdClass is not a value object the cast supports');
 
         $this->caster->castAs('x', 'broken', 'set');
     }
@@ -125,6 +126,7 @@ final class ValueObjectCastTest extends TestCase
     public function testAnUnsupportedClassFailsOnReadToo(): void
     {
         $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('stdClass is not a value object the cast supports');
 
         $this->caster->castAs('x', 'broken');
     }

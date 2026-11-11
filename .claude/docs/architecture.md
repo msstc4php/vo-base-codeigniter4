@@ -36,9 +36,13 @@ previous. (Before core 8c795e1 this was try-then-retry; `isComposite()` replaced
 
 ## Class checks
 
-`targetClass()` / `untrustedTargetClass()` first match the parameter against an FQCN regex (so nothing that is not a
+`targetClass()` / `untrustedTargetClass()` first match the parameter against an FQCN regex (ASCII letters, digits,
+`_` and bytes `\x80-\xff`, as PHP identifiers allow) (so nothing that is not a
 class name reaches `is_subclass_of()` and the autoloader), then ask `supports()` / `supportsUntrusted()`. The result
 is cached per parameter string in a static array: casts run on every property read.
+
+`fromInput()` asks `supportsUntrusted()` before any JSON decoding, so a trusted-source-only class is refused with the
+same message whatever the client sent.
 
 ## Writing
 

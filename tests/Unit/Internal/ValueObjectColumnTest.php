@@ -25,6 +25,7 @@ use MSSTC4PHP\ValueObject\Temporal\DateRange;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use ReflectionProperty;
 use stdClass;
 
 #[CoversClass(ValueObjectColumn::class)]
@@ -226,6 +227,7 @@ final class ValueObjectColumnTest extends TestCase
     {
         yield 'array' => [['value' => 'x', 'minLength' => 0, 'maxLength' => null]];
         yield 'JSON' => ['{"value":"x","minLength":0,"maxLength":null}'];
+        yield 'plain string' => ['x'];
     }
 
     #[DataProvider('rawBoundedStrings')]
@@ -315,9 +317,22 @@ final class ValueObjectColumnTest extends TestCase
     public function testACheckedClassIsCachedPerParameter(): void
     {
         self::assertSame(Port::class, ValueObjectColumn::targetClass(['\\' . Port::class]));
-        self::assertSame(Port::class, ValueObjectColumn::targetClass(['\\' . Port::class]));
-        self::assertSame(Port::class, ValueObjectColumn::untrustedTargetClass(Port::class));
-        self::assertSame(Port::class, ValueObjectColumn::untrustedTargetClass(Port::class));
+        self::assertSame(Latitude::class, ValueObjectColumn::untrustedTargetClass('\\' . Latitude::class));
+
+        $castClasses = new ReflectionProperty(ValueObjectColumn::class, 'castClasses')->getValue();
+        $inputClasses = new ReflectionProperty(ValueObjectColumn::class, 'inputClasses')->getValue();
+        self::assertIsArray($castClasses);
+        self::assertIsArray($inputClasses);
+        self::assertSame(Port::class, $castClasses['\\' . Port::class] ?? null);
+        self::assertSame(Latitude::class, $inputClasses['\\' . Latitude::class] ?? null);
+    }
+
+    public function testAClassNameMayUseNonAsciiLetters(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('App\\Ügyfél is not a value object the cast supports');
+
+        ValueObjectColumn::targetClass(['App\\Ügyfél']);
     }
 
     public function testADateRangeRoundTrips(): void

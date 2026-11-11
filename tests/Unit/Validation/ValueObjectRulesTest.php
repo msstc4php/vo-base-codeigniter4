@@ -135,6 +135,7 @@ final class ValueObjectRulesTest extends TestCase
     public function testAnUnsupportedClassFailsEvenForEmptyInput(): void
     {
         $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('stdClass cannot be validated from input');
 
         new ValueObjectRules()->valid_value_object(null, stdClass::class);
     }
@@ -150,6 +151,7 @@ final class ValueObjectRulesTest extends TestCase
     public function testBoundedStringIsRefusedForEmptyInputToo(): void
     {
         $this->expectException(LogicException::class);
+        $this->expectExceptionMessage(BoundedString::class . ' cannot be validated from input');
 
         new ValueObjectRules()->valid_value_object('', '\\' . BoundedString::class);
     }

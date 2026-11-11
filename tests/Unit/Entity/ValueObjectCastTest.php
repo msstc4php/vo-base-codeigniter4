@@ -161,6 +161,7 @@ final class ValueObjectCastTest extends TestCase
     public function testNullStillChecksTheConfiguration(): void
     {
         $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('The value-object cast needs a class parameter.');
 
         ValueObjectCast::set(null, []);
     }
@@ -168,6 +169,7 @@ final class ValueObjectCastTest extends TestCase
     public function testNullOnReadStillChecksTheConfiguration(): void
     {
         $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('The value-object cast needs a class parameter.');
 
         ValueObjectCast::get(null, []);
     }

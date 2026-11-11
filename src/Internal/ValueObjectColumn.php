@@ -23,7 +23,7 @@ final class ValueObjectColumn
 {
     private const string NULLABLE_MARKER = 'nullable';
 
-    private const string CLASS_NAME = '/^\\\\?[A-Za-z_][A-Za-z0-9_]*(?:\\\\[A-Za-z_][A-Za-z0-9_]*)*$/D';
+    private const string CLASS_NAME = '/^\\\\?[A-Za-z_\\x80-\\xff][A-Za-z0-9_\\x80-\\xff]*(?:\\\\[A-Za-z_\\x80-\\xff][A-Za-z0-9_\\x80-\\xff]*)*$/D';
 
     private static ?ValueObjectMapper $mapper = null;
 
@@ -101,7 +101,16 @@ final class ValueObjectColumn
      */
     public static function fromInput(mixed $input, string $class): ValueObject|BackedEnum
     {
-        return $input instanceof $class ? $input : self::mapper()->fromUntrustedPayload($class, self::payloadOf($input, $class));
+        if ($input instanceof $class) {
+            return $input;
+        }
+
+        // Refused before any JSON decoding, so the refusal does not depend on what the client sent.
+        if (!self::mapper()->supportsUntrusted($class)) {
+            return self::mapper()->fromUntrustedPayload($class, $input);
+        }
+
+        return self::mapper()->fromUntrustedPayload($class, self::payloadOf($input, $class));
     }
 
     /**
@@ -172,7 +181,8 @@ final class ValueObjectColumn
     }
 
     /**
-     * A composite is a JSON text column; anything else goes to the mapper as is.
+     * A composite is a JSON text column; anything else goes to the mapper as is. The result stays mixed: decoded JSON
+     * can be any type, and narrowing it here would repeat the type checks the mapper makes anyway.
      */
     private static function payloadOf(mixed $raw, string $class): mixed
     {
