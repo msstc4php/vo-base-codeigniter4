@@ -1,0 +1,30 @@
+deptrac:
+  paths:
+    - ./src
+  layers:
+    - name: Internal
+      collectors:
+        - type: directory
+          value: src/Internal/.*
+    - name: Entity
+      collectors:
+        - type: directory
+          value: src/Entity/.*
+    - name: DataCaster
+      collectors:
+        - type: directory
+          value: src/DataCaster/.*
+    - name: Validation
+      collectors:
+        - type: directory
+          value: src/Validation/.*
+  ruleset:
+    # The core and CodeIgniter are not declared as layers and therefore do not appear in the rules.
+    # The three public areas share Internal only and never see each other.
+    Internal: ~
+    Entity:
+      - Internal
+    DataCaster:
+      - Internal
+    Validation:
+      - Internal
