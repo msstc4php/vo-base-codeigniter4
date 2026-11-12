@@ -12,10 +12,11 @@ use CodeIgniter\HTTP\ResponseInterface;
 use CodeIgniter\HTTP\SiteURI;
 use CodeIgniter\HTTP\UserAgent;
 use CodeIgniter\Router\RouteCollection;
+use CodeIgniter\Validation\Validation;
 use Config\App;
 
 /**
- * One in-process request through CodeIgniter's router and controller runner, with explicit routes only.
+ * One in-process request through CodeIgniter's router and controller runner, with explicit routes only and the package's rule set registered.
  * The 404 override echoes the exception message, so a 404 comes back as a response instead of a thrown exception.
  */
 final class Http
@@ -41,12 +42,11 @@ final class Http
         Services::injectMock('uri', $uri);
         $request = new IncomingRequest($config, $uri, 'php://input', new UserAgent());
         $request->setMethod($method);
-        if ($post !== null) {
-            $request->setGlobal('post', $post);
-        }
+        $request->setGlobal('post', $post ?? []);
+        $request->setGlobal('request', $post ?? []);
 
         Services::injectMock('request', $request);
-        Services::injectMock('validation', Services::validation(null, false));
+        Services::injectMock('validation', new Validation(new ValidationConfig(), Services::renderer()));
 
         $collection = Services::routes();
         $collection->resetRoutes();
@@ -57,6 +57,9 @@ final class Http
         });
         $routes($collection);
         $collection->setHTTPVerb($method);
+
+        Services::resetSingle('router');
+        Services::resetSingle('filters');
 
         $app = new CodeIgniter($config);
         $app->initialize();
