@@ -17,6 +17,9 @@ use PHPUnit\Framework\Attributes\CoversTrait;
 use PHPUnit\Framework\Attributes\UsesClass;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * @phpstan-import-type PostShape from Http
+ */
 #[CoversTrait(ValidatedValueObjects::class)]
 #[UsesClass(ValidatedData::class)]
 #[UsesClass(ValueObjectColumn::class)]
@@ -89,7 +92,7 @@ final class ValidatedValueObjectsTest extends TestCase
     }
 
     /**
-     * @param array<string, mixed> $post
+     * @param PostShape $post
      */
     private function post(string $action, array $post): ResponseInterface
     {

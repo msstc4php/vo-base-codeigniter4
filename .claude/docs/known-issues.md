@@ -62,12 +62,6 @@ CodeIgniter fills `{field}` placeholders in rule parameters from the submitted d
 (`valid_value_object[{type}]` with `type=..\Evil` reaches the rule as `..\Evil`). The FQCN regex in
 `ValueObjectColumn::className()` refuses it before any class lookup; `ValueObjectRulesTest` pins it.
 
-## Equivalent mutants
-
-The `is_a(ValueObject|BackedEnum)` checks in `targetClass()`/`untrustedTargetClass()` are implied by
-`supports()`/`supportsUntrusted()` and exist for PHPStan narrowing; in the rule, `fromUntrustedPayload()` would refuse
-a `BoundedString` anyway; and the `??=` caches (mapper, checked class per parameter), which only save work.
-
 ## `@` is not a permitted URI character
 
 `Router` rejects a segment outside `Config\App::$permittedURIChars` (`a-z 0-9~%.:_\-` by default) with a 400
@@ -88,10 +82,13 @@ A route 404 override that echoes the message turns the rethrown `PageNotFoundExc
 Documented in the README: a controller using `ValueObjectArguments` is unreachable through Auto Routing (Improved),
 and a controller with its own `_remap()` cannot use the trait (a trait method is overridden by the class's own).
 
-## Equivalent mutants (controller layer)
+## Equivalent mutants
 
-`ArgumentBinder`: the `isDefaultValueAvailable()`/`allowsNull()` operands of the absent-parameter check (a missing
-required parameter ends in the same `ArgumentCountError` whether the loop breaks there or one parameter later), the
-`array_slice()` offset (surplus segments equal `$params` minus the converted prefix only for non-surplus input), the
-`$type instanceof` / `isBuiltin()` pair and its early `return null` (a builtin or union type fails `supports()` right
-after), and `array_values()` in `_remap()` (the variadic is already a list).
+- `ValueObjectColumn`: the `is_a(ValueObject|BackedEnum)` checks in `targetClass()`/`untrustedTargetClass()` are implied
+  by `supports()`/`supportsUntrusted()` and exist for PHPStan narrowing; in the rule, `fromUntrustedPayload()` would
+  refuse a `BoundedString` anyway; the `??=` caches (mapper, checked class per parameter) only save work.
+- `ArgumentBinder`: the `isDefaultValueAvailable()`/`allowsNull()` operands of the absent-parameter check and its
+  `break` (a missing required parameter ends in the same `ArgumentCountError` one parameter later), the
+  `array_slice()` offset (surplus segments), the `$type instanceof` / `isBuiltin()` pair and its early `return null`
+  (a builtin or union type fails `supports()` right after), and `array_values()` in `_remap()` (the variadic is
+  already a list).

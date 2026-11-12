@@ -10,6 +10,7 @@ use MSSTC4PHP\ValueObject\CodeIgniter4\Controller\ValueObjectArguments;
 use MSSTC4PHP\ValueObject\CodeIgniter4\Internal\ArgumentBinder;
 use MSSTC4PHP\ValueObject\CodeIgniter4\Internal\ValueObjectColumn;
 use MSSTC4PHP\ValueObject\CodeIgniter4\Tests\Support\CodeIgniterApp;
+use MSSTC4PHP\ValueObject\CodeIgniter4\Tests\Support\Controller\OverridingController;
 use MSSTC4PHP\ValueObject\CodeIgniter4\Tests\Support\Controller\UsersController;
 use Override;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -88,5 +89,12 @@ final class ArgumentBinderTest extends TestCase
         $this->expectException(ArgumentCountError::class);
 
         new UsersController()->_remap('nullableString');
+    }
+
+    public function testAnOverrideOfABaseControllerMethodIsNotFound(): void
+    {
+        $this->expectException(PageNotFoundException::class);
+
+        new OverridingController()->_remap('initController');
     }
 }

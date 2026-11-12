@@ -162,7 +162,8 @@ $routes->get('users/(:segment)', 'Users::show/$1');
 A scalar-backed value object (`EmailAddress`, `Port`, `Uuid`, ...) or a backed enum is built from the segment; an
 invalid one answers 404 (`PageNotFoundException`) with CodeIgniter's own message, never a class name. A nullable
 parameter whose segment is absent or `''` gets `null`; `''` for a non-nullable one is a 404. Variadics, union and
-intersection types, and every other type are left alone, so `EmailAddress|string $id` receives the plain string.
+intersection types, and every other type are left alone (a class the package does not support, such as your own
+service or entity, is never touched), so `EmailAddress|string $id` receives the plain string.
 
 A parameter typed with a supported class that cannot come from a URL segment (`BoundedString`, whose payload carries
 its own bounds; a composite such as `DateRange`) throws a `LogicException` naming the parameter: it is a programming
@@ -207,14 +208,16 @@ nested data. A missing, `null` or `''` field gives `null`; a composite is built 
 throws a `LogicException` when no validation ran, the field's value does not convert (the rule was not applied to it)
 or the class is not allowed from input (`BoundedString`). Only fields covered by the validation rules are visible.
 
-With `ResponseTrait`, `failValidationErrors()` answers 400 (`$codes['invalid_data']`). The bridge does not change it;
-to answer 422 override the property in your controller:
+With `ResponseTrait`, `failValidationErrors()` answers 400 (`$codes['invalid_data']`). The bridge does not change it.
+To answer 422, call `$this->fail($errors, 422)` directly, or change only that key of the property:
 
 ```php
-protected $codes = [/* the trait's defaults, */ 'invalid_data' => 422];
+public function initController(RequestInterface $request, ResponseInterface $response, LoggerInterface $logger): void
+{
+    parent::initController($request, $response, $logger);
+    $this->codes['invalid_data'] = 422;
+}
 ```
-
-In practice copy the array from `ResponseTrait` and change that entry, or call `fail($errors, 422)` directly.
 
 ## Stored formats
 

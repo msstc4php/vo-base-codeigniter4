@@ -80,8 +80,18 @@ final class UsersController extends Controller
         return 'static';
     }
 
+    public function visible(): string
+    {
+        return $this->hidden();
+    }
+
     public function _secret(): string
     {
         return 'secret';
+    }
+
+    private function hidden(): string
+    {
+        return 'hidden';
     }
 }

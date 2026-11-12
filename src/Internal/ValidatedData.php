@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace MSSTC4PHP\ValueObject\CodeIgniter4\Internal;
 
 use BackedEnum;
-use CodeIgniter\Helpers\Array\ArrayHelper;
 use CodeIgniter\Validation\ValidationInterface;
 use LogicException;
 use MSSTC4PHP\ValueObject\Contract\ValueObject;
@@ -25,6 +24,7 @@ final class ValidatedData
     /**
      * @template T of ValueObject|BackedEnum
      *
+     * @param non-empty-string $field
      * @param class-string<T> $class
      *
      * @return T|null null when the field is absent, null or ''
@@ -38,7 +38,9 @@ final class ValidatedData
         }
 
         ValueObjectColumn::untrustedTargetClass($class);
-        $value = ArrayHelper::dotSearch($field, $validator->getValidated());
+        // Reason: helper() and dot_array_search() are globals of CodeIgniter's Common.php and array helper, which PHPStan does not scan.
+        helper('array'); // @phpstan-ignore function.notFound
+        $value = dot_array_search($field, $validator->getValidated()); // @phpstan-ignore function.notFound
         if ($value === null || $value === '') {
             return null;
         }

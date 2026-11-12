@@ -31,7 +31,7 @@ final class ArgumentBinder
      * @throws PageNotFoundException when the method is not routable, or a parameter is not a valid value of its type
      * @throws LogicException when a parameter is typed with a class that cannot be bound from a URL segment
      */
-    public static function call(object $controller, string $method, array $params): mixed
+    public static function call(Controller $controller, string $method, array $params): mixed
     {
         $reflection = self::routable($controller, $method);
 
@@ -58,7 +58,7 @@ final class ArgumentBinder
         return $reflection->invokeArgs($controller, [...$arguments, ...\array_slice($params, \count($arguments))]);
     }
 
-    private static function routable(object $controller, string $method): ReflectionMethod
+    private static function routable(Controller $controller, string $method): ReflectionMethod
     {
         if (!method_exists($controller, $method)) {
             throw PageNotFoundException::forMethodNotFound($method);
@@ -69,7 +69,7 @@ final class ArgumentBinder
             !$reflection->isPublic()
             || $reflection->isStatic()
             || str_starts_with($reflection->getName(), '_')
-            || $reflection->getDeclaringClass()->getName() === Controller::class
+            || method_exists(Controller::class, $method)
         ) {
             throw PageNotFoundException::forMethodNotFound($method);
         }
