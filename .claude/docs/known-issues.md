@@ -87,8 +87,8 @@ and a controller with its own `_remap()` cannot use the trait (a trait method is
 - `ValueObjectColumn`: the `is_a(ValueObject|BackedEnum)` checks in `targetClass()`/`untrustedTargetClass()` are implied
   by `supports()`/`supportsUntrusted()` and exist for PHPStan narrowing; in the rule, `fromUntrustedPayload()` would
   refuse a `BoundedString` anyway; the `??=` caches (mapper, checked class per parameter) only save work.
-- `ArgumentBinder`: the `isDefaultValueAvailable()`/`allowsNull()` operands of the absent-parameter check and its
-  `break` (a missing required parameter ends in the same `ArgumentCountError` one parameter later), the
-  `array_slice()` offset (surplus segments), the `$type instanceof` / `isBuiltin()` pair and its early `return null`
-  (a builtin or union type fails `supports()` right after), and `array_values()` in `_remap()` (the variadic is
-  already a list).
+- `ArgumentBinder`: only `break` -> `continue` on the variadic check (a variadic parameter is always the last one, so
+  the loop ends either way). The earlier claims for the absent-parameter check, the `array_slice()` offset and the
+  `instanceof`/`isBuiltin()` guard were wrong: unit tests kill those mutants. Note that Infection counts only tests
+  that `#[CoversClass]` the mutated class, so `ArgumentBinder` behaviour must be pinned in `ArgumentBinderTest`, not
+  only in the integration tests (those `#[UsesClass]` it).

@@ -87,7 +87,7 @@ final class ControllerArgumentsTest extends TestCase
     {
         yield 'underscore prefix' => ['secret'];
         yield 'controller internals' => ['init'];
-        yield 'protected' => ['hidden'];
+        yield 'private' => ['hidden'];
         yield 'static' => ['static'];
         yield 'missing' => ['missing'];
     }

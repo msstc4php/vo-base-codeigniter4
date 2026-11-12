@@ -72,7 +72,7 @@ final class ArgumentBinderTest extends TestCase
      */
     public static function unroutableMethods(): iterable
     {
-        yield 'protected' => ['hidden'];
+        yield 'private' => ['hidden'];
         yield 'static' => ['staticAction'];
         yield 'underscore prefix' => ['_secret'];
         yield 'declared by the base controller' => ['initController'];
@@ -96,5 +96,32 @@ final class ArgumentBinderTest extends TestCase
         $this->expectException(PageNotFoundException::class);
 
         new OverridingController()->_remap('initController');
+    }
+
+    public function testARequiredParameterBeforeAnAbsentNullableOneKeepsThePhpError(): void
+    {
+        $this->expectException(ArgumentCountError::class);
+
+        new UsersController()->_remap('mixedTail');
+    }
+
+    public function testAnAbsentNullableParameterWithADefaultKeepsTheDefault(): void
+    {
+        self::assertSame('High', new UsersController()->_remap('defaultedEnum'));
+    }
+
+    public function testAnAbsentNullableParameterWithoutADefaultIsNull(): void
+    {
+        self::assertSame('maybe:null', new UsersController()->_remap('maybeNoDefault'));
+    }
+
+    public function testAVariadicReceivesTheRemainingSegmentsOnce(): void
+    {
+        self::assertSame('a|b,c', new UsersController()->_remap('rest', 'a', 'b', 'c'));
+    }
+
+    public function testAUnionTypedParameterIsLeftAlone(): void
+    {
+        self::assertSame('string:a@b.co', new UsersController()->_remap('union', 'a@b.co'));
     }
 }

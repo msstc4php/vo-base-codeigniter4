@@ -50,6 +50,16 @@ final class UsersController extends Controller
         return $name ?? 'null';
     }
 
+    public function mixedTail(string $name, ?EmailAddress $email): string
+    {
+        return $name . ':' . ($email ?? 'null');
+    }
+
+    public function defaultedEnum(?Priority $priority = Priority::High): string
+    {
+        return (string) $priority?->name;
+    }
+
     public function priority(Priority $priority): string
     {
         return 'priority:' . $priority->name;
