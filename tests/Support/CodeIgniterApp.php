@@ -26,8 +26,10 @@ final class CodeIgniterApp extends Boot
 
         $framework = \dirname(__DIR__, 2) . '/vendor/codeigniter4/framework';
         $writable = sys_get_temp_dir() . '/vo-base-codeigniter4-writable';
-        if (!is_dir($writable) && !mkdir($writable, 0o777, true) && !is_dir($writable)) {
-            throw new RuntimeException('Cannot create ' . $writable);
+        foreach (['', '/cache', '/logs', '/session'] as $directory) {
+            if (!is_dir($writable . $directory) && !mkdir($writable . $directory, 0o777, true) && !is_dir($writable . $directory)) {
+                throw new RuntimeException('Cannot create ' . $writable . $directory);
+            }
         }
 
         $_SERVER['CI_ENVIRONMENT'] = 'testing';

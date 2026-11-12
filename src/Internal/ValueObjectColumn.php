@@ -137,6 +137,11 @@ final class ValueObjectColumn
         }
     }
 
+    public static function mapper(): ValueObjectMapper
+    {
+        return self::$mapper ??= new ValueObjectMapper();
+    }
+
     /**
      * @return class-string<ValueObject|BackedEnum>
      */
@@ -195,10 +200,5 @@ final class ValueObjectColumn
         } catch (JsonException $e) {
             throw new InvalidPayloadException(\sprintf('A %s payload must be JSON text: %s', $class, $e->getMessage()), $e->getCode(), previous: $e);
         }
-    }
-
-    private static function mapper(): ValueObjectMapper
-    {
-        return self::$mapper ??= new ValueObjectMapper();
     }
 }
