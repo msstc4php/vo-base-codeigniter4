@@ -25,7 +25,7 @@ Neither this package nor the core is on Packagist yet, so register both GitHub r
         { "type": "vcs", "url": "https://github.com/msstc4php/vo-base-codeigniter4" }
     ],
     "require": {
-        "msstc4php/vo-base-codeigniter4": "^0.1"
+        "msstc4php/vo-base-codeigniter4": "^0.2"
     }
 }
 ```
@@ -136,6 +136,86 @@ same reason both casts write a `BoundedString` only from an instance: raw input 
 `InvalidPayloadException`. Which classes input may build is decided by the core's
 `ValueObjectMapper::supportsUntrusted()`.
 
+## Controller arguments
+
+Route parameters as typed controller arguments. Add the trait and route explicitly:
+
+```php
+use MSSTC4PHP\ValueObject\CodeIgniter4\Controller\ValueObjectArguments;
+
+final class Users extends BaseController
+{
+    use ValueObjectArguments;
+
+    public function show(EmailAddress $email, ?Priority $priority = null): string
+    {
+        // ...
+    }
+}
+```
+
+```php
+// app/Config/Routes.php
+$routes->get('users/(:segment)', 'Users::show/$1');
+```
+
+A scalar-backed value object (`EmailAddress`, `Port`, `Uuid`, ...) or a backed enum is built from the segment; an
+invalid one answers 404 (`PageNotFoundException`) with CodeIgniter's own message, never a class name. A nullable
+parameter whose segment is absent or `''` gets `null`; `''` for a non-nullable one is a 404. Variadics, union and
+intersection types, and every other type are left alone, so `EmailAddress|string $id` receives the plain string.
+
+A parameter typed with a supported class that cannot come from a URL segment (`BoundedString`, whose payload carries
+its own bounds; a composite such as `DateRange`) throws a `LogicException` naming the parameter: it is a programming
+error, found on the first request.
+
+Limitations of the trait:
+
+- **Explicit routes only.** The trait implements `_remap()`, and Auto Routing (Improved) answers 404 for any
+  controller that has one (`AutoRouterImproved::checkRemap()`). Auto Routing is off by default
+  (`Config\Routing::$autoRoute = false`).
+- A controller with its own `_remap()` cannot use the trait.
+- `_remap()` switches CodeIgniter's own "method exists" check off, so the trait repeats it: a missing, non-public,
+  static, `_`-prefixed method or one declared by `CodeIgniter\Controller` is a 404.
+- CodeIgniter rejects `@` in URI segments unless `Config\App::$permittedURIChars` allows it (an email address in a
+  path needs `@` added to it).
+
+## Validated data
+
+After a validation that includes `valid_value_object`, read the vetted fields as value objects:
+
+```php
+use MSSTC4PHP\ValueObject\CodeIgniter4\Controller\ValidatedValueObjects;
+
+final class Signup extends BaseController
+{
+    use ValidatedValueObjects;
+
+    public function create(): ResponseInterface
+    {
+        if (!$this->validate(['email' => 'required|valid_value_object[' . EmailAddress::class . ']'])) {
+            return $this->response->setStatusCode(422)->setJSON($this->validator->getErrors());
+        }
+
+        $email = $this->validatedValueObject('email', EmailAddress::class); // EmailAddress
+        // ...
+    }
+}
+```
+
+`validatedValueObject($field, $class)` reads `$this->validator->getValidated()`; a dot key (`profile.email`) reaches
+nested data. A missing, `null` or `''` field gives `null`; a composite is built from an array or JSON text. It
+throws a `LogicException` when no validation ran, the field's value does not convert (the rule was not applied to it)
+or the class is not allowed from input (`BoundedString`). Only fields covered by the validation rules are visible.
+
+With `ResponseTrait`, `failValidationErrors()` answers 400 (`$codes['invalid_data']`). The bridge does not change it;
+to answer 422 override the property in your controller:
+
+```php
+protected $codes = [/* the trait's defaults, */ 'invalid_data' => 422];
+```
+
+In practice copy the array from `ResponseTrait` and change that entry, or call `fail($errors, 422)` directly.
+
 ## Stored formats
 
 | Value object | Column holds | Example |
@@ -152,7 +232,7 @@ An invalid stored value throws the value object's exception, a wrong type or mal
 
 ## Limitations
 
-- No custom `PayloadCodec`s in 0.1.0: CodeIgniter calls cast handlers statically, so the package uses a
+- No custom `PayloadCodec`s (casts, rule, controller arguments and validated data alike): CodeIgniter calls cast handlers statically, so the package uses a
   `ValueObjectMapper` with the core's built-in codecs only. A class of your own needs to be scalar-backed or a backed
   enum; a composite of your own is refused with a `LogicException`.
 - One failure per field, as with every CodeIgniter rule.

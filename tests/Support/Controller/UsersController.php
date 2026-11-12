@@ -40,6 +40,16 @@ final class UsersController extends Controller
         return $name . ':' . $email;
     }
 
+    public function pair(EmailAddress $email, Priority $priority): string
+    {
+        return $email . ':' . $priority->name;
+    }
+
+    public function nullableString(?string $name): string
+    {
+        return $name ?? 'null';
+    }
+
     public function priority(Priority $priority): string
     {
         return 'priority:' . $priority->name;

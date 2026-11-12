@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.0 - 2026-11-12
+
+- `Controller\ValueObjectArguments`: controller trait (`_remap()`) converting route parameters to scalar-backed value
+  objects and backed enums; invalid input is a 404. Explicit routes only: Auto Routing (Improved) refuses `_remap()`.
+- `Controller\ValidatedValueObjects`: `validatedValueObject($field, $class)` reads a validated field as a value
+  object (dot keys, composites from arrays or JSON text).
+- A parameter typed with a trusted-source-only or composite class is a `LogicException`, never the raw string.
+- No change to the 0.1.0 public API.
+
 ## 0.1.0 - 2026-11-11
 
 First release. No stability promise before 1.0.

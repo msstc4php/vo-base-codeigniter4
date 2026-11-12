@@ -67,3 +67,31 @@ CodeIgniter fills `{field}` placeholders in rule parameters from the submitted d
 The `is_a(ValueObject|BackedEnum)` checks in `targetClass()`/`untrustedTargetClass()` are implied by
 `supports()`/`supportsUntrusted()` and exist for PHPStan narrowing; in the rule, `fromUntrustedPayload()` would refuse
 a `BoundedString` anyway; and the `??=` caches (mapper, checked class per parameter), which only save work.
+
+## `@` is not a permitted URI character
+
+`Router` rejects a segment outside `Config\App::$permittedURIChars` (`a-z 0-9~%.:_\-` by default) with a 400
+`BadRequestException`, after URL-decoding, so `%40` does not help. An email address in a route needs `@` added to the
+setting. The test harness sets it.
+
+## HTTP test harness (`tests/Support/Http`)
+
+`FeatureTestTrait` needs `CIUnitTestCase`, so tests run `CodeIgniter::run($routes, true)` themselves. Gotchas:
+the shared `filters` and `router` services keep the first request (the controller then receives a stale request and
+its POST data: reset both per call with `Services::resetSingle()`); `Controller::validate()` reads
+`$request->getVar()`, which is the `request` global, so set `post` and `request` both; `Config\App` is invisible to
+PHPStan (one `@phpstan-ignore class.notFound` with its Reason); the writable path needs `cache/`, `logs/`, `session/`.
+A route 404 override that echoes the message turns the rethrown `PageNotFoundException` into a 404 response.
+
+## `_remap()` and Auto Routing (Improved)
+
+Documented in the README: a controller using `ValueObjectArguments` is unreachable through Auto Routing (Improved),
+and a controller with its own `_remap()` cannot use the trait (a trait method is overridden by the class's own).
+
+## Equivalent mutants (controller layer)
+
+`ArgumentBinder`: the `isDefaultValueAvailable()`/`allowsNull()` operands of the absent-parameter check (a missing
+required parameter ends in the same `ArgumentCountError` whether the loop breaks there or one parameter later), the
+`array_slice()` offset (surplus segments equal `$params` minus the converted prefix only for non-surplus input), the
+`$type instanceof` / `isBuiltin()` pair and its early `return null` (a builtin or union type fails `supports()` right
+after), and `array_values()` in `_remap()` (the variadic is already a list).

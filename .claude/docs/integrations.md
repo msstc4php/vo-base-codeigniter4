@@ -39,3 +39,20 @@
 - `permit_empty` short-circuits empty input before our rule; `required` is separate. We also pass `null`/`''`/`[]`.
 - Form arrays are strings: `range[min]=1` gives `['min' => '1']`, which `IntRangeCodec` rejects (it wants ints). JSON
   bodies work. Composite validation is therefore mostly for JSON APIs.
+
+## Controller arguments (`_remap`)
+
+- `CodeIgniter::runController()` calls `$class->_remap($method, ...$params)` when it exists; route params are strings
+  and the file is not `strict_types`. `_remap` also disables CI's own method-exists 404 (the trait re-implements it).
+- `AutoRouterImproved::checkRemap()` answers 404 for any controller with `_remap()`: explicit routes only (owner's
+  decision). `PageNotFoundException` is code 404; in `display404errors()` CI rethrows it (message kept outside
+  production) or uses the route's 404 override.
+- Positional: `$params[i]` is parameter `i`; `(:segment)` never captures an empty string, so `''` only arrives when a
+  caller passes it.
+
+## Validated data
+
+- `Controller::validate()` creates `$this->validator` via `service('validation')`; before any `validate()` the
+  property is `null` (our "no validation ran" `LogicException`). `Validation::getValidated()` is the subset of the
+  data the rules cover (`DotArrayFilter`), nested as in the input.
+- `ResponseTrait::failValidationErrors()` uses `$codes['invalid_data']` = 400; the README shows the 422 override.

@@ -8,13 +8,18 @@ use CodeIgniter\HTTP\ResponseInterface;
 use CodeIgniter\Router\RouteCollection;
 use LogicException;
 use MSSTC4PHP\ValueObject\CodeIgniter4\Controller\ValueObjectArguments;
+use MSSTC4PHP\ValueObject\CodeIgniter4\Internal\ArgumentBinder;
+use MSSTC4PHP\ValueObject\CodeIgniter4\Internal\ValueObjectColumn;
 use MSSTC4PHP\ValueObject\CodeIgniter4\Tests\Support\Controller\UsersController;
 use MSSTC4PHP\ValueObject\CodeIgniter4\Tests\Support\Http;
-use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\CoversTrait;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\UsesClass;
 use PHPUnit\Framework\TestCase;
 
-#[CoversClass(ValueObjectArguments::class)]
+#[CoversTrait(ValueObjectArguments::class)]
+#[UsesClass(ArgumentBinder::class)]
+#[UsesClass(ValueObjectColumn::class)]
 final class ControllerArgumentsTest extends TestCase
 {
     public function testAValidSegmentBecomesTheValueObject(): void

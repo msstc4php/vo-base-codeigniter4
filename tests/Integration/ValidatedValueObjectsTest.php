@@ -8,12 +8,19 @@ use CodeIgniter\HTTP\ResponseInterface;
 use CodeIgniter\Router\RouteCollection;
 use LogicException;
 use MSSTC4PHP\ValueObject\CodeIgniter4\Controller\ValidatedValueObjects;
+use MSSTC4PHP\ValueObject\CodeIgniter4\Internal\ValidatedData;
+use MSSTC4PHP\ValueObject\CodeIgniter4\Internal\ValueObjectColumn;
 use MSSTC4PHP\ValueObject\CodeIgniter4\Tests\Support\Controller\ProfileController;
 use MSSTC4PHP\ValueObject\CodeIgniter4\Tests\Support\Http;
-use PHPUnit\Framework\Attributes\CoversClass;
+use MSSTC4PHP\ValueObject\CodeIgniter4\Validation\ValueObjectRules;
+use PHPUnit\Framework\Attributes\CoversTrait;
+use PHPUnit\Framework\Attributes\UsesClass;
 use PHPUnit\Framework\TestCase;
 
-#[CoversClass(ValidatedValueObjects::class)]
+#[CoversTrait(ValidatedValueObjects::class)]
+#[UsesClass(ValidatedData::class)]
+#[UsesClass(ValueObjectColumn::class)]
+#[UsesClass(ValueObjectRules::class)]
 final class ValidatedValueObjectsTest extends TestCase
 {
     public function testAValidatedFieldBecomesTheValueObject(): void

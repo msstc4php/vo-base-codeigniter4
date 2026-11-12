@@ -1,9 +1,9 @@
 # Architecture
 
 ```
-Entity      DataCaster      Validation
-   \            |              /
-    +------ Internal ---------+
+Entity      DataCaster      Validation      Controller
+   \            |              |              /
+    +---------------- Internal --------------+
                 |
    core: Payload\ValueObjectMapper
 ```
@@ -18,9 +18,17 @@ Entity      DataCaster      Validation
 - **`Entity\ValueObjectCast`** and **`DataCaster\ValueObjectCast`**: thin adapters over `Internal` for CodeIgniter's
   two cast interfaces (`CodeIgniter\Entity\Cast\CastInterface` and `CodeIgniter\DataCaster\Cast\CastInterface`).
 - **`Validation\ValueObjectRules`**: rule set object, also over `Internal`.
+- **`Controller\ValueObjectArguments`** (trait, `_remap()`) over **`Internal\ArgumentBinder`**: reflects the target
+  method, checks it is routable, converts positional route parameters typed with a scalar-backed class or enum
+  through `fromUntrustedPayload()`. Supported-but-unbindable classes (`!supportsUntrusted()`, composites) are a
+  `LogicException`; invalid input a `PageNotFoundException`. Variadics stop the loop; union/intersection and
+  unsupported types are untouched. Trailing absent nullable parameters without a default get `null`.
+- **`Controller\ValidatedValueObjects`** (trait, protected `validatedValueObject()`) over **`Internal\ValidatedData`**:
+  `ArrayHelper::dotSearch()` on `$this->validator->getValidated()`, then `ValueObjectColumn::fromInput()`.
+  `ValueObjectColumn::mapper()` is public (still `@internal`) so the binder shares the mapper.
 - `src/Language/en/Validation.php`: the default message, a plain PHP array file.
 
-`deptrac.yaml` lets the three public areas depend on `Internal` only; they never reference each other.
+`deptrac.yaml` lets the four public areas depend on `Internal` only; they never reference each other.
 
 ## Why static
 
