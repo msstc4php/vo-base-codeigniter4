@@ -6,6 +6,7 @@ namespace MSSTC4PHP\ValueObject\CodeIgniter4\Tests\Unit\Internal;
 
 use ArgumentCountError;
 use CodeIgniter\Exceptions\PageNotFoundException;
+use LogicException;
 use MSSTC4PHP\ValueObject\CodeIgniter4\Controller\ValueObjectArguments;
 use MSSTC4PHP\ValueObject\CodeIgniter4\Internal\ArgumentBinder;
 use MSSTC4PHP\ValueObject\CodeIgniter4\Internal\ValueObjectColumn;
@@ -42,9 +43,9 @@ final class ArgumentBinderTest extends TestCase
         new UsersController()->_remap('show', '');
     }
 
-    public function testAnAbsentNonNullableParameterKeepsThePhpError(): void
+    public function testAnAbsentRequiredValueObjectParameterIsNotFound(): void
     {
-        $this->expectException(ArgumentCountError::class);
+        $this->expectException(PageNotFoundException::class);
 
         new UsersController()->_remap('show');
     }
@@ -123,5 +124,39 @@ final class ArgumentBinderTest extends TestCase
     public function testAUnionTypedParameterIsLeftAlone(): void
     {
         self::assertSame('string:a@b.co', new UsersController()->_remap('union', 'a@b.co'));
+    }
+
+    public function testEveryVariadicElementIsConverted(): void
+    {
+        self::assertSame('a@b.co,c@d.co', new UsersController()->_remap('emails', 'a@b.co', 'c@d.co'));
+        self::assertSame('', new UsersController()->_remap('emails'));
+    }
+
+    public function testAnInvalidVariadicElementIsNotFound(): void
+    {
+        $this->expectException(PageNotFoundException::class);
+
+        new UsersController()->_remap('emails', 'a@b.co', 'nope');
+    }
+
+    public function testAnUnbindableVariadicTypeIsAProgrammerError(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('$texts');
+
+        new UsersController()->_remap('boundedVariadic', 'abc');
+    }
+
+    public function testAnUnbindableParameterIsFoundWhateverTheRequestCarries(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('own constraints');
+
+        new UsersController()->_remap('lateUnbindable');
+    }
+
+    public function testAScalarParameterKeepsPhpWeakModeCoercion(): void
+    {
+        self::assertSame('int:5', new UsersController()->_remap('intId', '5'));
     }
 }

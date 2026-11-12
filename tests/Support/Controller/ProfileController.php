@@ -71,6 +71,13 @@ final class ProfileController extends Controller
         return (string) $this->validatedValueObject('email', EmailAddress::class);
     }
 
+    public function wildcard(): string
+    {
+        $this->validate(['emails.*' => 'required']);
+
+        return (string) $this->validatedValueObject('emails.*', EmailAddress::class);
+    }
+
     public function untrusted(): string
     {
         $this->validate(['text' => 'required']);

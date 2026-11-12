@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace MSSTC4PHP\ValueObject\CodeIgniter4\Controller;
 
+use CodeIgniter\Controller;
 use CodeIgniter\Exceptions\PageNotFoundException;
 use LogicException;
 use MSSTC4PHP\ValueObject\CodeIgniter4\Internal\ArgumentBinder;
@@ -14,6 +15,8 @@ use MSSTC4PHP\ValueObject\CodeIgniter4\Internal\ArgumentBinder;
  * Implements `_remap()`, so it needs explicit routes (Auto Routing (Improved) answers 404 for any controller with a
  * `_remap()`), and a controller with its own `_remap()` cannot use it. Scalar-backed value objects and backed enums
  * are converted; anything else is left to the framework.
+ *
+ * @phpstan-require-extends Controller
  */
 trait ValueObjectArguments
 {

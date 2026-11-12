@@ -161,7 +161,9 @@ $routes->get('users/(:segment)', 'Users::show/$1');
 
 A scalar-backed value object (`EmailAddress`, `Port`, `Uuid`, ...) or a backed enum is built from the segment; an
 invalid one answers 404 (`PageNotFoundException`) with CodeIgniter's own message, never a class name. A nullable
-parameter whose segment is absent or `''` gets `null`; `''` for a non-nullable one is a 404. Variadics, union and
+parameter whose segment is absent or `''` gets `null`; `''` for a non-nullable one is a 404, and so is a missing required (non-nullable, no default) value-object or enum
+parameter. A variadic parameter typed with a value object converts every element. Other types keep CodeIgniter's
+and PHP's behaviour (`int $id` still receives `'5'` as `5`); union and
 intersection types, and every other type are left alone (a class the package does not support, such as your own
 service or entity, is never touched), so `EmailAddress|string $id` receives the plain string.
 
@@ -206,7 +208,9 @@ final class Signup extends BaseController
 `validatedValueObject($field, $class)` reads `$this->validator->getValidated()`; a dot key (`profile.email`) reaches
 nested data. A missing, `null` or `''` field gives `null`; a composite is built from an array or JSON text. It
 throws a `LogicException` when no validation ran, the field's value does not convert (the rule was not applied to it)
-or the class is not allowed from input (`BoundedString`). Only fields covered by the validation rules are visible.
+or the class is not allowed from input (`BoundedString`). Read only fields validated with `valid_value_object[<same
+class>]`: any other value that does not convert is a `LogicException` (a 500, a programming error). Only fields
+covered by the validation rules are visible, and a `*` wildcard in the field name is refused with a `LogicException`.
 
 With `ResponseTrait`, `failValidationErrors()` answers 400 (`$codes['invalid_data']`). The bridge does not change it.
 To answer 422, call `$this->fail($errors, 422)` directly, or change only that key of the property:

@@ -91,6 +91,14 @@ final class ValidatedValueObjectsTest extends TestCase
         $this->post('untrusted', ['text' => 'abc']);
     }
 
+    public function testAWildcardFieldIsALogicError(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('wildcard');
+
+        $this->post('wildcard', ['emails' => ['a@b.co']]);
+    }
+
     /**
      * @param PostShape $post
      */

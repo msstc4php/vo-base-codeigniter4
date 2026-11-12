@@ -87,8 +87,13 @@ and a controller with its own `_remap()` cannot use the trait (a trait method is
 - `ValueObjectColumn`: the `is_a(ValueObject|BackedEnum)` checks in `targetClass()`/`untrustedTargetClass()` are implied
   by `supports()`/`supportsUntrusted()` and exist for PHPStan narrowing; in the rule, `fromUntrustedPayload()` would
   refuse a `BoundedString` anyway; the `??=` caches (mapper, checked class per parameter) only save work.
-- `ArgumentBinder`: only `break` -> `continue` on the variadic check (a variadic parameter is always the last one, so
-  the loop ends either way). The earlier claims for the absent-parameter check, the `array_slice()` offset and the
-  `instanceof`/`isBuiltin()` guard were wrong: unit tests kill those mutants. Note that Infection counts only tests
-  that `#[CoversClass]` the mutated class, so `ArgumentBinder` behaviour must be pinned in `ArgumentBinderTest`, not
-  only in the integration tests (those `#[UsesClass]` it).
+- `ArgumentBinder`: none proven. Infection counts only tests that `#[CoversClass]` the mutated class, so
+  `ArgumentBinder` behaviour is pinned in `ArgumentBinderTest`, not only in the integration tests (those
+  `#[UsesClass]` it). Plans are computed per call (no cache) to keep the binder stateless.
+
+## Argument binding rules
+
+A bound (value object or enum) parameter that is missing and required is a 404 (no 500 for client input); non-bound
+parameters keep PHP's behaviour (`ArgumentCountError`, weak-mode `'5'` -> `5`). Every parameter's bindability is
+checked before binding, so an unbindable type fails on every request. A variadic with a bound type converts each
+element.

@@ -37,6 +37,10 @@ final class ValidatedData
             throw new LogicException(\sprintf('No validation ran: call $this->validate() or validateData() before reading "%s".', $field));
         }
 
+        if (str_contains($field, '*')) {
+            throw new LogicException(\sprintf('The field "%s" contains a wildcard: read one concrete field at a time.', $field));
+        }
+
         ValueObjectColumn::untrustedTargetClass($class);
         // Reason: helper() and dot_array_search() are globals of CodeIgniter's Common.php and array helper, which PHPStan does not scan.
         helper('array'); // @phpstan-ignore function.notFound

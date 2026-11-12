@@ -60,6 +60,26 @@ final class UsersController extends Controller
         return (string) $priority?->name;
     }
 
+    public function emails(EmailAddress ...$emails): string
+    {
+        return implode(',', array_map(strval(...), $emails));
+    }
+
+    public function boundedVariadic(BoundedString ...$texts): string
+    {
+        return 'unreachable';
+    }
+
+    public function lateUnbindable(string $name, BoundedString $text): string
+    {
+        return 'unreachable';
+    }
+
+    public function intId(int $id): string
+    {
+        return get_debug_type($id) . ':' . $id;
+    }
+
     public function priority(Priority $priority): string
     {
         return 'priority:' . $priority->name;

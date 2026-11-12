@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MSSTC4PHP\ValueObject\CodeIgniter4\Controller;
 
 use BackedEnum;
+use CodeIgniter\Controller;
 use CodeIgniter\Validation\ValidationInterface;
 use LogicException;
 use MSSTC4PHP\ValueObject\CodeIgniter4\Internal\ValidatedData;
@@ -16,6 +17,8 @@ use MSSTC4PHP\ValueObject\Contract\ValueObject;
  * Only the fields the validation covered are visible.
  *
  * @property ValidationInterface|null $validator set by CodeIgniter\Controller::validate()
+ *
+ * @phpstan-require-extends Controller
  */
 trait ValidatedValueObjects
 {

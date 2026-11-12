@@ -28,34 +28,55 @@ final class ArgumentBinder
     /**
      * @param list<string> $params
      *
-     * @throws PageNotFoundException when the method is not routable, or a parameter is not a valid value of its type
+     * @throws PageNotFoundException when the method is not routable, or a bound parameter is missing or not a valid value of its type
      * @throws LogicException when a parameter is typed with a class that cannot be bound from a URL segment
      */
     public static function call(Controller $controller, string $method, array $params): mixed
     {
         $reflection = self::routable($controller, $method);
+        $classes = self::plan($reflection);
 
         $arguments = [];
         foreach ($reflection->getParameters() as $position => $parameter) {
+            $class = $classes[$position];
             if ($parameter->isVariadic()) {
-                break;
+                foreach (\array_slice($params, $position) as $segment) {
+                    $arguments[] = $class === null ? $segment : self::convert($segment, $class, $parameter);
+                }
+
+                return $reflection->invokeArgs($controller, $arguments);
             }
 
-            $class = self::boundClass($parameter);
             if (\array_key_exists($position, $params)) {
                 $arguments[] = $class === null ? $params[$position] : self::convert($params[$position], $class, $parameter);
 
                 continue;
             }
 
-            if ($class === null || $parameter->isDefaultValueAvailable() || !$parameter->allowsNull()) {
+            if ($class === null || $parameter->isDefaultValueAvailable()) {
                 break;
+            }
+
+            if (!$parameter->allowsNull()) {
+                throw PageNotFoundException::forPageNotFound();
             }
 
             $arguments[] = null;
         }
 
-        return $reflection->invokeArgs($controller, [...$arguments, ...\array_slice($params, \count($arguments))]);
+        return $reflection->invokeArgs($controller, $arguments);
+    }
+
+    /**
+     * The bindable class of every parameter, checked up front so an unbindable one is found on every request.
+     *
+     * @return list<class-string<ValueObject|BackedEnum>|null>
+     *
+     * @throws LogicException when a parameter is typed with a supported class that cannot be bound
+     */
+    private static function plan(ReflectionMethod $method): array
+    {
+        return array_map(static fn (ReflectionParameter $parameter): ?string => self::boundClass($parameter, $method), $method->getParameters());
     }
 
     private static function routable(Controller $controller, string $method): ReflectionMethod
@@ -82,7 +103,7 @@ final class ArgumentBinder
      *
      * @throws LogicException when the class is supported but cannot be bound
      */
-    private static function boundClass(ReflectionParameter $parameter): ?string
+    private static function boundClass(ReflectionParameter $parameter, ReflectionMethod $method): ?string
     {
         $type = $parameter->getType();
         if (!$type instanceof ReflectionNamedType || $type->isBuiltin()) {
@@ -96,11 +117,11 @@ final class ArgumentBinder
         }
 
         if (!$mapper->supportsUntrusted($class)) {
-            throw new LogicException(\sprintf('Parameter $%s of %s::%s() cannot be bound from the route: its payload carries its own constraints, so a URL segment would choose them.', $parameter->getName(), self::declaringClass($parameter), $parameter->getDeclaringFunction()->getName()));
+            throw new LogicException(\sprintf('Parameter $%s of %s::%s() cannot be bound from the route: its payload carries its own constraints, so a URL segment would choose them.', $parameter->getName(), $method->class, $method->name));
         }
 
         if ($mapper->isComposite($class)) {
-            throw new LogicException(\sprintf('Parameter $%s of %s::%s() cannot be bound from the route: a URL segment is a string, but this class is built from several values.', $parameter->getName(), self::declaringClass($parameter), $parameter->getDeclaringFunction()->getName()));
+            throw new LogicException(\sprintf('Parameter $%s of %s::%s() cannot be bound from the route: a URL segment is a string, but this class is built from several values.', $parameter->getName(), $method->class, $method->name));
         }
 
         \assert(is_a($class, ValueObject::class, true) || is_a($class, BackedEnum::class, true));
@@ -122,10 +143,5 @@ final class ArgumentBinder
         } catch (InvalidValueObjectException) {
             throw PageNotFoundException::forPageNotFound();
         }
-    }
-
-    private static function declaringClass(ReflectionParameter $parameter): string
-    {
-        return $parameter->getDeclaringClass()?->getName() ?? '';
     }
 }
