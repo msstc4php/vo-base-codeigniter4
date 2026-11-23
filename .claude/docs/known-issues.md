@@ -97,3 +97,10 @@ A bound (value object or enum) parameter that is missing and required is a 404 (
 parameters keep PHP's behaviour (`ArgumentCountError`, weak-mode `'5'` -> `5`). Every parameter's bindability is
 checked before binding, so an unbindable type fails on every request. A variadic with a bound type converts each
 element.
+
+## Mapper service name is lowercase
+
+`ValueObjectColumn::SERVICE = 'valueobjectmapper'`. CodeIgniter lowercases the name in `getSharedInstance()`,
+`injectMock()` and `resetSingle()` but not in `Services::get()`/`override()`, so a camelCase name leaked a mocked
+mapper between tests. A service that is not a `ValueObjectMapper` is a `LogicException`; a missing one falls back to
+`new ValueObjectMapper()`.
