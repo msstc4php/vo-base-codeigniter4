@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.0 - unreleased
+
+- Custom payload codecs: the casts, the rule, controller arguments and validated data use the application's
+  `valueObjectMapper` service when it defines one (`Config\Services::valueObjectMapper()` or `Services::override()`),
+  else a mapper with the core's codecs, as before. Composites of your own and vo-documents' composite names now work;
+  before, any class with a codec of its own was refused with a `LogicException`. A `valueObjectMapper` service that
+  is no `ValueObjectMapper` throws `LogicException`. The service name is looked up in lowercase (`valueobjectmapper`),
+  the form CodeIgniter keeps shared instances and mocks under.
+
 ## 0.2.0 - 2026-11-12
 
 - `Controller\ValueObjectArguments`: controller trait (`_remap()`) converting route parameters to scalar-backed value

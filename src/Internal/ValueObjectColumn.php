@@ -23,6 +23,10 @@ final class ValueObjectColumn
 {
     private const string NULLABLE_MARKER = 'nullable';
 
+    // CodeIgniter lowercases service names in getSharedInstance(), injectMock() and resetSingle() but not in get() or
+    // override(), so only the lowercase name reaches the shared instance in every case.
+    private const string SERVICE = 'valueobjectmapper';
+
     private const string CLASS_NAME = '/^\\\\?[A-Za-z_\\x80-\\xff][A-Za-z0-9_\\x80-\\xff]*(?:\\\\[A-Za-z_\\x80-\\xff][A-Za-z0-9_\\x80-\\xff]*)*$/D';
 
     private static ?ValueObjectMapper $mapper = null;
@@ -85,7 +89,13 @@ final class ValueObjectColumn
      */
     public static function fromStorage(mixed $stored, string $class): ValueObject|BackedEnum
     {
-        return $stored instanceof $class ? $stored : self::mapper()->fromPayload($class, self::payloadOf($stored, $class));
+        if ($stored instanceof $class) {
+            return $stored;
+        }
+
+        $mapper = self::mapper();
+
+        return $mapper->fromPayload($class, self::payloadOf($mapper, $stored, $class));
     }
 
     /**
@@ -101,16 +111,7 @@ final class ValueObjectColumn
      */
     public static function fromInput(mixed $input, string $class): ValueObject|BackedEnum
     {
-        if ($input instanceof $class) {
-            return $input;
-        }
-
-        // Refused before any JSON decoding, so the refusal does not depend on what the client sent.
-        if (!self::mapper()->supportsUntrusted($class)) {
-            return self::mapper()->fromUntrustedPayload($class, $input);
-        }
-
-        return self::mapper()->fromUntrustedPayload($class, self::payloadOf($input, $class));
+        return self::inputWith(self::mapper(), $input, $class);
     }
 
     /**
@@ -124,7 +125,8 @@ final class ValueObjectColumn
      */
     public static function toStorage(mixed $value, string $class): string|int|float
     {
-        $payload = self::mapper()->toPayload(self::fromInput($value, $class));
+        $mapper = self::mapper();
+        $payload = $mapper->toPayload(self::inputWith($mapper, $value, $class));
 
         if (!\is_array($payload)) {
             return $payload;
@@ -137,9 +139,44 @@ final class ValueObjectColumn
         }
     }
 
+    /**
+     * The application's `valueObjectMapper` service when it defines one (`Config\Services::valueObjectMapper()`, or
+     * `Services::override('valueobjectmapper', ...)`), so its codecs reach every cast, rule and argument; else a mapper
+     * with the core's codecs. CodeIgniter calls the casts statically, so a service is the only way in.
+     *
+     * @throws LogicException when the service is defined but is no ValueObjectMapper
+     */
     public static function mapper(): ValueObjectMapper
     {
-        return self::$mapper ??= new ValueObjectMapper();
+        $service = \function_exists('service') ? service(self::SERVICE) : null;
+        if ($service === null) {
+            return self::$mapper ??= new ValueObjectMapper();
+        }
+
+        return $service instanceof ValueObjectMapper ? $service : throw new LogicException(\sprintf('The %s service is %s, not a %s.', self::SERVICE, get_debug_type($service), ValueObjectMapper::class));
+    }
+
+    /**
+     * @template T of ValueObject|BackedEnum
+     *
+     * @param class-string<T> $class
+     *
+     * @return T
+     *
+     * @throws InvalidValueObjectException
+     */
+    private static function inputWith(ValueObjectMapper $mapper, mixed $input, string $class): ValueObject|BackedEnum
+    {
+        if ($input instanceof $class) {
+            return $input;
+        }
+
+        // Refused before any JSON decoding, so the refusal does not depend on what the client sent.
+        if (!$mapper->supportsUntrusted($class)) {
+            return $mapper->fromUntrustedPayload($class, $input);
+        }
+
+        return $mapper->fromUntrustedPayload($class, self::payloadOf($mapper, $input, $class));
     }
 
     /**
@@ -189,9 +226,9 @@ final class ValueObjectColumn
      * A composite is a JSON text column; anything else goes to the mapper as is. The result stays mixed: decoded JSON
      * can be any type, and narrowing it here would repeat the type checks the mapper makes anyway.
      */
-    private static function payloadOf(mixed $raw, string $class): mixed
+    private static function payloadOf(ValueObjectMapper $mapper, mixed $raw, string $class): mixed
     {
-        if (!\is_string($raw) || !self::mapper()->isComposite($class)) {
+        if (!\is_string($raw) || !$mapper->isComposite($class)) {
             return $raw;
         }
 

@@ -237,11 +237,34 @@ An invalid stored value throws the value object's exception, a wrong type or mal
 `InvalidPayloadException`; both extend `InvalidValueObjectException`. A class the mapper cannot handle throws a
 `LogicException` on first use.
 
+## Custom codecs
+
+CodeIgniter calls cast handlers statically, so the casts, the rule, controller arguments and validated data all ask for
+one `valueObjectMapper` service. Define it in `app/Config/Services.php` with your codecs (or a package's whole set
+through its `ProvidesCodecs` class); without it they use a mapper with the core's built-in codecs:
+
+```php
+use MSSTC4PHP\ValueObject\Payload\ValueObjectMapper;
+
+public static function valueObjectMapper(bool $getShared = true): ValueObjectMapper
+{
+    if ($getShared) {
+        return static::getSharedInstance('valueObjectMapper');
+    }
+
+    return new ValueObjectMapper([new MoneyCodec()]);
+    // vo-documents' composite names: new ValueObjectMapper(\MSSTC4PHP\ValueObject\Documents\Codecs::all())
+}
+```
+
+`Services::override('valueobjectmapper', $mapper)` works too (in tests, say; `resetSingle('valueobjectmapper')` undoes
+it). Write the name in lowercase there: CodeIgniter lowercases it in `getSharedInstance()`, `injectMock()` and
+`resetSingle()` but not in `override()`; `Services::injectMock('valueobjectmapper', $mapper)` works too. A
+service that is not a `ValueObjectMapper` throws `LogicException`. A cast class is checked against the mapper once
+per process, the first time it is used, so a mapper swapped later must support the same classes.
+
 ## Limitations
 
-- No custom `PayloadCodec`s (casts, rule, controller arguments and validated data alike): CodeIgniter calls cast handlers statically, so the package uses a
-  `ValueObjectMapper` with the core's built-in codecs only. A class of your own needs to be scalar-backed or a backed
-  enum; a composite of your own is refused with a `LogicException`.
 - One failure per field, as with every CodeIgniter rule.
 
 ## Development
