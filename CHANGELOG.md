@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.3.0 - unreleased
+## 0.3.0 - 2026-11-23
 
 - Custom payload codecs: the casts, the rule, controller arguments and validated data use the application's
   `valueObjectMapper` service when it defines one (`Config\Services::valueObjectMapper()` or `Services::override()`),
