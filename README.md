@@ -25,7 +25,7 @@ Neither this package nor the core is on Packagist yet, so register both GitHub r
         { "type": "vcs", "url": "https://github.com/msstc4php/vo-base-codeigniter4" }
     ],
     "require": {
-        "msstc4php/vo-base-codeigniter4": "^0.2"
+        "msstc4php/vo-base-codeigniter4": "^0.3"
     }
 }
 ```
