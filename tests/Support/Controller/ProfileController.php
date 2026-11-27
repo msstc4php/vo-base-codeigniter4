@@ -96,6 +96,13 @@ final class ProfileController extends Controller
         return (string) $this->validatedValueObject('email', EmailAddress::class);
     }
 
+    public function uncheckedRange(): string
+    {
+        $this->validate(['range' => 'required']);
+
+        return (string) $this->validatedValueObject('range', DateRange::class)?->start->format('Y-m-d');
+    }
+
     public function wildcard(): string
     {
         $this->validate(['emails.*' => 'required']);

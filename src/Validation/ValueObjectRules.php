@@ -22,7 +22,7 @@ final class ValueObjectRules
      */
     public function valid_value_object(mixed $value, ?string $class = null): bool
     {
-        $class = ValueObjectColumn::untrustedTargetClass($class);
+        $class = ValueObjectColumn::untrustedTargetClass($class, ValueObjectColumn::RULE);
 
         if (in_array($value, [null, '', []], true)) {
             return true;

@@ -6,6 +6,7 @@ namespace MSSTC4PHP\ValueObject\CodeIgniter4\Tests\Integration;
 
 use CodeIgniter\HTTP\ResponseInterface;
 use CodeIgniter\Router\RouteCollection;
+use JsonException;
 use LogicException;
 use MSSTC4PHP\ValueObject\CodeIgniter4\Controller\ValidatedValueObjects;
 use MSSTC4PHP\ValueObject\CodeIgniter4\Internal\ValidatedData;
@@ -13,7 +14,10 @@ use MSSTC4PHP\ValueObject\CodeIgniter4\Internal\ValueObjectColumn;
 use MSSTC4PHP\ValueObject\CodeIgniter4\Tests\Support\Controller\ProfileController;
 use MSSTC4PHP\ValueObject\CodeIgniter4\Tests\Support\Http;
 use MSSTC4PHP\ValueObject\CodeIgniter4\Validation\ValueObjectRules;
+use MSSTC4PHP\ValueObject\Exception\InvalidPayloadException;
 use MSSTC4PHP\ValueObject\Exception\InvalidValueObjectException;
+use MSSTC4PHP\ValueObject\Primitive\BoundedString;
+use MSSTC4PHP\ValueObject\Temporal\DateRange;
 use PHPUnit\Framework\Attributes\CoversTrait;
 use PHPUnit\Framework\Attributes\UsesClass;
 use PHPUnit\Framework\TestCase;
@@ -89,11 +93,22 @@ final class ValidatedValueObjectsTest extends TestCase
         $this->post('unconvertible', ['email' => ['x']]);
     }
 
+    public function testCompositeJsonTextThatDoesNotParseHasTheBridgesPayloadErrorAsPrevious(): void
+    {
+        $exception = $this->logicError('uncheckedRange', ['range' => '{"start":"SeCrEt-7f3a"']);
+
+        self::assertSame('The validated field "range" does not convert to the requested class: validate it with valid_value_object[<class>].', $exception->getMessage());
+        $previous = $exception->getPrevious();
+        self::assertInstanceOf(InvalidPayloadException::class, $previous);
+        self::assertSame('A ' . DateRange::class . ' payload must be JSON text: Syntax error', $previous->getMessage());
+        self::assertInstanceOf(JsonException::class, $previous->getPrevious());
+    }
+
     public function testATrustedSourceOnlyClassIsALogicError(): void
     {
         $exception = $this->logicError('untrusted', ['text' => 'abc']);
 
-        self::assertStringStartsWith('The value-object validation rule parameter names a class that cannot be validated from input', $exception->getMessage());
+        self::assertSame(BoundedString::class . ' cannot be built from input: it is not supported, or its payload carries its own constraints (BoundedString: the input would choose its bounds).', $exception->getMessage());
         self::assertNull($exception->getPrevious());
     }
 

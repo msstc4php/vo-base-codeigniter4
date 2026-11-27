@@ -36,6 +36,8 @@
   `customErrors[field][rule]` then `lang('Validation.valid_value_object')`. `Language::requireFile()` merges every
   `Language/en/Validation.php` found by `FileLocator::search()` across namespaces; our namespace is there via Composer
   discovery (`Modules::$discoverInComposer`, default true; `composerPackages` only/exclude can remove it).
+- `Validation::getErrorMessage()` fills `{field}`, `{param}` and `{value}` in every message: `{value}` is the client's
+  input, `{param}` our class name. The default uses `{field}` only; README warns against the other two.
 - `permit_empty` short-circuits empty input before our rule; `required` is separate. We also pass `null`/`''`/`[]`.
 - Form arrays are strings: `range[min]=1` gives `['min' => '1']`, which `IntRangeCodec` rejects (it wants ints). JSON
   bodies work. Composite validation is therefore mostly for JSON APIs.

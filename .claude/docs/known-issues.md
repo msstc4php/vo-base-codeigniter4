@@ -100,7 +100,12 @@ and a controller with its own `_remap()` cannot use the trait (a trait method is
 
 - `ValueObjectColumn`: the `is_a(ValueObject|BackedEnum)` checks in `targetClass()`/`untrustedTargetClass()` are implied
   by `supports()`/`supportsUntrusted()` and exist for PHPStan narrowing; in the rule, `fromUntrustedPayload()` would
-  refuse a `BoundedString` anyway; the `??=` caches (mapper, checked class per parameter) only save work.
+  refuse a `BoundedString` anyway; the `??=` caches (mapper, checked class per parameter) only save work;
+  `PublicVisibility` on `mapper()` escapes because Infection runs the unit suite only (`infection.json5`:
+  `--testsuite=unit`), and the calls from outside the class that would fail (`MapperServiceTest`, the integration
+  tests through `ArgumentBinder`/`ValidatedData`) are integration tests. The ResolvesConcreteClass/ProvidesCodecs
+  tests are integration tests too, so they add no kills. Full run at 1.0
+  (2026-11-27 UTC): 128 mutants, 120 killed, 8 escaped (all of these), MSI 93.75% (CI gate 75%).
 - `ArgumentBinder`: none proven. Infection counts only tests that `#[CoversClass]` the mutated class, so
   `ArgumentBinder` behaviour is pinned in `ArgumentBinderTest`, not only in the integration tests (those
   `#[UsesClass]` it). Plans are computed per call (no cache) to keep the binder stateless.

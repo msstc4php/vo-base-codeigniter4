@@ -21,6 +21,13 @@ use MSSTC4PHP\ValueObject\Payload\ValueObjectMapper;
  */
 final class ValueObjectColumn
 {
+    /**
+     * Its parameter can come from a `{field}` placeholder, so its messages never quote it.
+     */
+    public const string RULE = 'validation rule';
+
+    public const string VALIDATED_DATA = 'validated data';
+
     private const string NULLABLE_MARKER = 'nullable';
 
     // CodeIgniter lowercases service names in getSharedInstance(), injectMock() and resetSingle() but not in get() or
@@ -65,15 +72,17 @@ final class ValueObjectColumn
     }
 
     /**
+     * @param self::RULE|self::VALIDATED_DATA $usage
+     *
      * @return class-string<ValueObject|BackedEnum>
      *
      * @throws LogicException when the class is missing, not supported, or may not be built from input (BoundedString)
      */
-    public static function untrustedTargetClass(?string $parameter): string
+    public static function untrustedTargetClass(?string $parameter, string $usage): string
     {
         $parameter ??= '';
 
-        return self::$inputClasses[$parameter] ??= self::checkedInputClass($parameter);
+        return self::$inputClasses[$parameter] ??= self::checkedInputClass($parameter, $usage);
     }
 
     /**
@@ -193,22 +202,26 @@ final class ValueObjectColumn
     }
 
     /**
+     * @param self::RULE|self::VALIDATED_DATA $usage
+     *
      * @return class-string<ValueObject|BackedEnum>
      */
-    private static function checkedInputClass(string $parameter): string
+    private static function checkedInputClass(string $parameter, string $usage): string
     {
-        $class = self::className($parameter, 'validation rule');
-        if (!self::mapper()->supportsUntrusted($class) || (!is_a($class, ValueObject::class, true) && !is_a($class, BackedEnum::class, true))) {
-            // The class is not named: a rule parameter built from a placeholder is the client's text.
+        $class = self::className($parameter, $usage);
+        if (self::mapper()->supportsUntrusted($class) && (is_a($class, ValueObject::class, true) || is_a($class, BackedEnum::class, true))) {
+            return $class;
+        }
+
+        if ($usage === self::RULE) {
             throw new LogicException('The value-object validation rule parameter names a class that cannot be validated from input: it is not supported, or its payload carries its own constraints (BoundedString: check the length with min_length/max_length, or use NonEmptyString).');
         }
 
-        return $class;
+        throw new LogicException(\sprintf('%s cannot be built from input: it is not supported, or its payload carries its own constraints (BoundedString: the input would choose its bounds).', $class));
     }
 
     /**
-     * Checked before any class lookup, so a parameter built from a placeholder never reaches the autoloader. The
-     * message does not quote the parameter: a placeholder fills it from the submitted data.
+     * Checked before any class lookup, so a parameter built from a placeholder never reaches the autoloader.
      */
     private static function className(string $parameter, string $usage): string
     {
@@ -217,7 +230,7 @@ final class ValueObjectColumn
         }
 
         if (preg_match(self::CLASS_NAME, $parameter) !== 1) {
-            throw new LogicException(\sprintf('The value-object %s parameter is not a class name.', $usage));
+            throw new LogicException($usage === self::RULE ? 'The value-object validation rule parameter is not a class name.' : \sprintf('The value-object %s parameter "%s" is not a class name.', $usage, InvalidValueObjectException::excerpt($parameter)));
         }
 
         // The codec lookup is keyed by the class name as ::class spells it, without a leading backslash.

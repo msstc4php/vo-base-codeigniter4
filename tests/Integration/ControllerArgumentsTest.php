@@ -126,10 +126,13 @@ final class ControllerArgumentsTest extends TestCase
 
     public function testACompositeIsAProgrammerError(): void
     {
-        $this->expectException(LogicException::class);
-        $this->expectExceptionMessage('$range');
-
-        $this->get('composite/abc');
+        try {
+            $this->get('composite/abc');
+            self::fail('A LogicException was expected.');
+        } catch (LogicException $e) {
+            self::assertSame(\sprintf('Parameter $range of %s::composite() cannot be bound from the route: a URL segment is a string, but this class is built from several values.', UsersController::class), $e->getMessage());
+            self::assertNull($e->getPrevious());
+        }
     }
 
     private function get(string $path): ResponseInterface

@@ -76,11 +76,25 @@ final class ValueObjectColumnTest extends TestCase
         self::assertStringStartsWith($class . ' is not a value object the cast supports', $exception->getMessage());
     }
 
-    public function testAnUnsupportedClassIsRefusedForInput(): void
+    public function testAnUnsupportedClassIsRefusedForTheRuleWithoutNamingIt(): void
     {
-        $this->expectExceptionMessage('The value-object validation rule parameter names a class that cannot be validated from input');
+        $exception = self::configurationError(static fn (): string => ValueObjectColumn::untrustedTargetClass(stdClass::class, ValueObjectColumn::RULE));
 
-        ValueObjectColumn::untrustedTargetClass(stdClass::class);
+        self::assertSame('The value-object validation rule parameter names a class that cannot be validated from input: it is not supported, or its payload carries its own constraints (BoundedString: check the length with min_length/max_length, or use NonEmptyString).', $exception->getMessage());
+    }
+
+    public function testAnUnsupportedClassIsNamedForValidatedData(): void
+    {
+        $exception = self::configurationError(static fn (): string => ValueObjectColumn::untrustedTargetClass(BoundedString::class, ValueObjectColumn::VALIDATED_DATA));
+
+        self::assertSame(BoundedString::class . ' cannot be built from input: it is not supported, or its payload carries its own constraints (BoundedString: the input would choose its bounds).', $exception->getMessage());
+    }
+
+    public function testATextThatIsNotAClassNameIsQuotedForValidatedData(): void
+    {
+        $exception = self::configurationError(static fn (): string => ValueObjectColumn::untrustedTargetClass('App Foo', ValueObjectColumn::VALIDATED_DATA));
+
+        self::assertSame('The value-object validated data parameter "App Foo" is not a class name.', $exception->getMessage());
     }
 
     /**
@@ -244,15 +258,14 @@ final class ValueObjectColumnTest extends TestCase
 
     public function testUntrustedTargetClassRequiresAParameter(): void
     {
-        $this->expectException(LogicException::class);
-        $this->expectExceptionMessage('The value-object validation rule needs a class parameter.');
+        $exception = self::configurationError(static fn (): string => ValueObjectColumn::untrustedTargetClass(null, ValueObjectColumn::RULE));
 
-        ValueObjectColumn::untrustedTargetClass(null);
+        self::assertSame('The value-object validation rule needs a class parameter.', $exception->getMessage());
     }
 
     public function testUntrustedTargetClassAcceptsALeadingBackslash(): void
     {
-        self::assertSame(IntRange::class, ValueObjectColumn::untrustedTargetClass('\\' . IntRange::class));
+        self::assertSame(IntRange::class, ValueObjectColumn::untrustedTargetClass('\\' . IntRange::class, ValueObjectColumn::RULE));
     }
 
     public function testInputIsReadLikeStorageForOrdinaryClasses(): void
@@ -292,7 +305,7 @@ final class ValueObjectColumnTest extends TestCase
         spl_autoload_register($probe);
 
         try {
-            ValueObjectColumn::untrustedTargetClass($parameter);
+            ValueObjectColumn::untrustedTargetClass($parameter, ValueObjectColumn::RULE);
             self::fail('A LogicException was expected.');
         } catch (LogicException $e) {
             self::assertSame('The value-object validation rule parameter is not a class name.', $e->getMessage());
@@ -304,18 +317,17 @@ final class ValueObjectColumnTest extends TestCase
         self::assertSame([], $autoloaded);
     }
 
-    public function testAnInvalidCastParameterIsRefusedToo(): void
+    public function testAnInvalidCastParameterIsRefusedTooAndQuoted(): void
     {
-        $this->expectException(LogicException::class);
-        $this->expectExceptionObject(new LogicException('The value-object cast parameter is not a class name.'));
+        $exception = self::configurationError(static fn (): string => ValueObjectColumn::targetClass(['{x}']));
 
-        ValueObjectColumn::targetClass(['{x}']);
+        self::assertSame('The value-object cast parameter "{x}" is not a class name.', $exception->getMessage());
     }
 
     public function testACheckedClassIsCachedPerParameter(): void
     {
         self::assertSame(Port::class, ValueObjectColumn::targetClass(['\\' . Port::class]));
-        self::assertSame(Latitude::class, ValueObjectColumn::untrustedTargetClass('\\' . Latitude::class));
+        self::assertSame(Latitude::class, ValueObjectColumn::untrustedTargetClass('\\' . Latitude::class, ValueObjectColumn::VALIDATED_DATA));
 
         $castClasses = new ReflectionProperty(ValueObjectColumn::class, 'castClasses')->getValue();
         $inputClasses = new ReflectionProperty(ValueObjectColumn::class, 'inputClasses')->getValue();

@@ -41,7 +41,7 @@ final class ValidatedData
             throw new LogicException(\sprintf('The field "%s" contains a wildcard: read one concrete field at a time.', $field));
         }
 
-        ValueObjectColumn::untrustedTargetClass($class);
+        ValueObjectColumn::untrustedTargetClass($class, ValueObjectColumn::VALIDATED_DATA);
         // Reason: helper() and dot_array_search() are globals of CodeIgniter's Common.php and array helper, which PHPStan does not scan.
         helper('array'); // @phpstan-ignore function.notFound
         $value = dot_array_search($field, $validator->getValidated()); // @phpstan-ignore function.notFound

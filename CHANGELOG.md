@@ -17,7 +17,8 @@ the stored formats, and which exception each path throws. Not covered: message w
 - The `LogicException` for a rule parameter that is not a class name no longer quotes it (it read `parameter "..." is
   not a class name`), and the one for a class the rule cannot validate from input no longer names the class: a
   `{field}` placeholder in the parameter fills it from the submitted data, so the message repeated the client's text.
-  The same messages apply to `validatedValueObject()` and to the cast's "not a class name" error.
+  `validatedValueObject()` and the casts, whose class is developer code, keep naming it (`validatedValueObject()`
+  now says "`<class>` cannot be built from input").
 - A controller method that is not routable (missing, non-public, static, `_`-prefixed or declared by
   `CodeIgniter\Controller`) is a 404 with CodeIgniter's generic `HTTP.pageNotFound` message, like an invalid
   segment; it used `forMethodNotFound()`, whose message names the method, which a route such as `Users::$1` takes
@@ -31,7 +32,7 @@ the stored formats, and which exception each path throws. Not covered: message w
   service name.
 - Update `msstc4php/vo-base` to ^1.4 if it is pinned lower.
 - Code or tests that match the old texts of the rule-parameter `LogicException`s (`parameter "<text>" is not a class
-  name`, `<class> cannot be validated from input`) or the old 404 text (`Controller method is not found: "<method>"`)
+  name`, `<class> cannot be validated from input`, the latter also from `validatedValueObject()`) or the old 404 text (`Controller method is not found: "<method>"`)
   need the new ones; message wording is not covered by 1.x.
 
 ## 0.3.0 - 2026-11-23

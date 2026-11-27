@@ -47,10 +47,12 @@ previous. (Before core 8c795e1 this was try-then-retry; `isComposite()` replaced
 
 ## Class checks
 
-Messages: none of the `LogicException`s on the input path (`untrustedTargetClass()`, used by the rule and by
-`ValidatedData`) quotes the parameter or the class, and the "not a class name" one quotes it for neither usage (1.0,
-O3): a `{field}` placeholder in a rule parameter is client data. The cast-only messages ("not a value object the cast
-supports", the extra-parameter one) still name the class/parameters: `$casts` is developer code.
+Messages: `untrustedTargetClass($parameter, $usage)` takes `ValueObjectColumn::RULE` (the rule) or
+`VALIDATED_DATA` (`ValidatedData`). For `RULE` neither the "not a class name" nor the "cannot be validated from input"
+message quotes the parameter or the class (1.0, O3): a `{field}` placeholder in a rule parameter is client data. For
+`VALIDATED_DATA` and the casts (`targetClass()`), the class is developer code, so the messages quote/name it
+("`<class>` cannot be built from input", `parameter "<excerpt>" is not a class name`). The success cache
+`$inputClasses` is shared by both usages; errors are never cached (`??=` throws before assigning).
 
 `targetClass()` / `untrustedTargetClass()` first match the parameter against an FQCN regex (ASCII letters, digits,
 `_` and bytes `\x80-\xff`, as PHP identifiers allow) (so nothing that is not a

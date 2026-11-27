@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace MSSTC4PHP\ValueObject\CodeIgniter4\Tests\Unit\Validation;
 
+use Closure;
 use CodeIgniter\Config\Services;
 use CodeIgniter\Validation\Validation;
 use LogicException;
@@ -109,10 +110,9 @@ final class ValueObjectRulesTest extends TestCase
         $validation = $this->validation();
         $validation->setRules(['email' => 'valid_value_object']);
 
-        $this->expectException(LogicException::class);
-        $this->expectExceptionMessage('The value-object validation rule needs a class parameter');
+        $exception = $this->configurationError(static fn (): bool => $validation->run(['email' => 'a@example.com']));
 
-        $validation->run(['email' => 'a@example.com']);
+        self::assertSame('The value-object validation rule needs a class parameter.', $exception->getMessage());
     }
 
     public function testAPlaceholderInTheParameterCannotReachTheAutoloader(): void
@@ -145,30 +145,49 @@ final class ValueObjectRulesTest extends TestCase
 
     public function testAnUnsupportedClassIsAProgrammerError(): void
     {
-        $this->expectExceptionObject(new LogicException(self::UNSUPPORTED));
+        $exception = $this->configurationError(static fn (): bool => new ValueObjectRules()->valid_value_object('x', stdClass::class));
 
-        new ValueObjectRules()->valid_value_object('x', stdClass::class);
+        self::assertSame(self::UNSUPPORTED, $exception->getMessage());
     }
 
     public function testAnUnsupportedClassFailsEvenForEmptyInput(): void
     {
-        $this->expectExceptionObject(new LogicException(self::UNSUPPORTED));
+        $exception = $this->configurationError(static fn (): bool => new ValueObjectRules()->valid_value_object(null, stdClass::class));
 
-        new ValueObjectRules()->valid_value_object(null, stdClass::class);
+        self::assertSame(self::UNSUPPORTED, $exception->getMessage());
     }
 
     public function testBoundedStringIsRefusedBecauseTheClientWouldChooseTheBounds(): void
     {
-        $this->expectExceptionObject(new LogicException(self::UNSUPPORTED));
+        $exception = $this->configurationError(static fn (): bool => new ValueObjectRules()->valid_value_object('{"value":"x","minLength":0,"maxLength":null}', BoundedString::class));
 
-        new ValueObjectRules()->valid_value_object('{"value":"x","minLength":0,"maxLength":null}', BoundedString::class);
+        self::assertSame(self::UNSUPPORTED, $exception->getMessage());
     }
 
     public function testBoundedStringIsRefusedForEmptyInputToo(): void
     {
-        $this->expectExceptionObject(new LogicException(self::UNSUPPORTED));
+        $exception = $this->configurationError(static fn (): bool => new ValueObjectRules()->valid_value_object('', '\\' . BoundedString::class));
 
-        new ValueObjectRules()->valid_value_object('', '\\' . BoundedString::class);
+        self::assertSame(self::UNSUPPORTED, $exception->getMessage());
+    }
+
+    /**
+     * A configuration error is a plain LogicException with no previous exception.
+     *
+     * @param Closure(): mixed $call
+     */
+    private function configurationError(Closure $call): LogicException
+    {
+        try {
+            $call();
+        } catch (LogicException $e) {
+            self::assertSame(LogicException::class, $e::class);
+            self::assertNull($e->getPrevious());
+
+            return $e;
+        }
+
+        self::fail('A LogicException was expected.');
     }
 
     private function validation(): Validation

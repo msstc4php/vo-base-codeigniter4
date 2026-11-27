@@ -120,8 +120,9 @@ the rule for presence.
 
 The rule parameter must be a literal class name. Never put a `{field}` placeholder in it: CodeIgniter fills
 placeholders from the submitted data, which would let a client pick the class. A parameter that is not a class name
-is refused with a `LogicException` before any class lookup or autoload. Neither that message nor the one for a class
-the rule cannot validate quotes the parameter, since a placeholder would make it the client's text.
+is refused with a `LogicException` before any class lookup or autoload; a value shaped like a class name
+(`App\Foo`) still reaches the autoloader. Neither that message nor the one for a class the rule cannot validate
+quotes the parameter, since a placeholder would make it the client's text.
 
 Composites (`IntRange`, `GeoCoordinates`, `DateRange`) validate from JSON text or from an array with real types, as
 a JSON request body gives them. HTML form fields are always strings, so `range[min]=1&range[max]=5` fails for
@@ -129,7 +130,8 @@ a JSON request body gives them. HTML form fields are always strings, so `range[m
 ("The {field} field does not contain a valid value.") comes from this package's `Language/en/Validation.php`,
 which CodeIgniter finds through Composer package discovery (`Config\Modules::$discoverInComposer`, on by default);
 with discovery off, add `valid_value_object` to your own `app/Language/en/Validation.php`. Per-field custom
-messages work as for any rule.
+messages work as for any rule. CodeIgniter also fills `{value}` and `{param}` in every rule message: `{value}` would
+repeat the client's input and `{param}` the class name. The default uses neither.
 
 `BoundedString` is refused by the rule (a `LogicException`, a configuration error): its payload carries its own
 bounds, so input would choose them. Check lengths with `min_length`/`max_length`, or use `NonEmptyString`. For the
@@ -278,14 +280,17 @@ service is defined) live as long as the worker, so define the service at boot, n
 
 - **Code API:** these classes and traits, with the methods below. None declares a constructor: CodeIgniter calls the
   casts statically and builds the rule set without arguments.
-  - `Entity\ValueObjectCast`, the Entity cast handler, with CodeIgniter's static `get($value, array $params = [])` and
-    `set($value, array $params = [])`;
+  - `Entity\ValueObjectCast`, the Entity cast handler, with CodeIgniter's static `get($value, array $params = [])`,
+    returning `ValueObject|BackedEnum|null`, and `set($value, array $params = [])`, returning
+    `string|int|float|null`;
   - `DataCaster\ValueObjectCast`, the Model field cast handler, with CodeIgniter's static
-    `get(mixed $value, array $params = [], ?object $helper = null)` and `set(...)` of the same parameters;
+    `get(mixed $value, array $params = [], ?object $helper = null)`, returning `ValueObject|BackedEnum`, and `set(...)`
+    of the same parameters, returning `string|int|float`;
   - `Validation\ValueObjectRules`, the rule set, with `valid_value_object(mixed $value, ?string $class = null): bool`;
-  - `Controller\ValueObjectArguments`, the controller trait, with `_remap(string $method, string ...$params)`;
+  - `Controller\ValueObjectArguments`, the controller trait, with `_remap(string $method, string ...$params): mixed`;
   - `Controller\ValidatedValueObjects`, the controller trait, with the protected
-    `validatedValueObject(string $field, string $class)`.
+    `validatedValueObject(string $field, string $class)`, returning `ValueObject|BackedEnum|null` (an override in
+    your controller must declare a compatible return type).
 
   The traits hold only these methods. No 1.x release adds a method, property or constant to them: a method your
   class declares would silently replace the trait's (or fail to compile if the signatures differ), a trait method

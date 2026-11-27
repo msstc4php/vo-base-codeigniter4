@@ -96,10 +96,14 @@ final class ProvidesCodecsTest extends TestCase
         $controller = '\\' . UsersController::class;
 
         // Supported through the set, so the binder refuses it as a composite instead of leaving it to PHP.
-        $this->expectExceptionObject(new LogicException(\sprintf('Parameter $size of %s::size() cannot be bound from the route: a URL segment is a string, but this class is built from several values.', UsersController::class)));
-
-        Http::request(static function (RouteCollection $routes) use ($controller): void {
-            $routes->get('size/(:segment)', $controller . '::size/$1');
-        }, 'GET', 'size/x');
+        try {
+            Http::request(static function (RouteCollection $routes) use ($controller): void {
+                $routes->get('size/(:segment)', $controller . '::size/$1');
+            }, 'GET', 'size/x');
+            self::fail('A LogicException was expected.');
+        } catch (LogicException $e) {
+            self::assertSame(\sprintf('Parameter $size of %s::size() cannot be bound from the route: a URL segment is a string, but this class is built from several values.', UsersController::class), $e->getMessage());
+            self::assertNull($e->getPrevious());
+        }
     }
 }
