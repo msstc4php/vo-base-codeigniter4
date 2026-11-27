@@ -15,3 +15,15 @@
 - Test fixtures avoid `Config\*` classes and global CI functions (`service()`, `config()`): PHPStan cannot see them
   (no Composer autoload for `app/Config` or `system/Common.php`). Use `CodeIgniter\Config\Services::renderer()`,
   `CodeIgniter\Database\Config::connect()` and the local `Tests\Support\ValidationConfig`.
+- **Redaction tests** (1.0): a message that must not carry client input is checked with the marker `SeCrEt-7f3a`
+  (`SeCrEt7f3a` where it must pass the class-name regex) and an exact `assertSame`; where there is a cause, the test
+  also shows the cause quotes the marker, and where the README promises "no previous", `assertNull(getPrevious())`
+  pins it (`ArgumentBinderTest::assertNotFound()`, `ValueObjectColumnTest::configurationError()`,
+  `ValidatedValueObjectsTest::logicError()`).
+- **Trait surface**: each controller trait has a reflection test freezing its method list and asserting no
+  properties and no constants (the BC promise "no 1.x release adds a method, property or constant to them"; Roave
+  does not report additions to a trait).
+- **vo-base 1.4 fixtures**: `Tests\Support\Code` (abstract, `ResolvesConcreteClass`; `ShortCode` up to three
+  letters, `LongCode` four to six) and `AppCodecs` (`ProvidesCodecs` -> `DimensionsCodec`), with `CodeHolder` as
+  their Entity. The rule is called directly in those tests: a failing rule inside `Validation` loads the language file
+  (see known-issues, strict coverage metadata).

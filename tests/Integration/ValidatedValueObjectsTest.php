@@ -13,9 +13,12 @@ use MSSTC4PHP\ValueObject\CodeIgniter4\Internal\ValueObjectColumn;
 use MSSTC4PHP\ValueObject\CodeIgniter4\Tests\Support\Controller\ProfileController;
 use MSSTC4PHP\ValueObject\CodeIgniter4\Tests\Support\Http;
 use MSSTC4PHP\ValueObject\CodeIgniter4\Validation\ValueObjectRules;
+use MSSTC4PHP\ValueObject\Exception\InvalidValueObjectException;
 use PHPUnit\Framework\Attributes\CoversTrait;
 use PHPUnit\Framework\Attributes\UsesClass;
 use PHPUnit\Framework\TestCase;
+use ReflectionClass;
+use ReflectionMethod;
 
 /**
  * @phpstan-import-type PostShape from Http
@@ -58,10 +61,10 @@ final class ValidatedValueObjectsTest extends TestCase
 
     public function testBeforeAnyValidationItIsALogicError(): void
     {
-        $this->expectException(LogicException::class);
-        $this->expectExceptionMessage('validate');
+        $exception = $this->logicError('beforeValidation', []);
 
-        $this->post('beforeValidation', []);
+        self::assertSame('No validation ran: call $this->validate() or validateData() before reading "email".', $exception->getMessage());
+        self::assertNull($exception->getPrevious());
     }
 
     public function testAFieldTheValidationDidNotCoverIsNull(): void
@@ -69,12 +72,14 @@ final class ValidatedValueObjectsTest extends TestCase
         self::assertSame('', $this->post('unvalidatedField', ['email' => 'jane@example.com'])->getBody());
     }
 
-    public function testAValueThatDoesNotConvertIsALogicError(): void
+    public function testAValueThatDoesNotConvertIsALogicErrorThatCarriesNoPartOfTheValueWhileTheCauseQuotesIt(): void
     {
-        $this->expectException(LogicException::class);
-        $this->expectExceptionMessage('"email"');
+        $exception = $this->logicError('unconvertible', ['email' => 'SeCrEt-7f3a']);
 
-        $this->post('unconvertible', ['email' => 'nope']);
+        self::assertSame('The validated field "email" does not convert to the requested class: validate it with valid_value_object[<class>].', $exception->getMessage());
+        $previous = $exception->getPrevious();
+        self::assertInstanceOf(InvalidValueObjectException::class, $previous);
+        self::assertStringContainsString('SeCrEt-7f3a', $previous->getMessage());
     }
 
     public function testAnArrayWhereAScalarIsExpectedIsALogicError(): void
@@ -86,17 +91,43 @@ final class ValidatedValueObjectsTest extends TestCase
 
     public function testATrustedSourceOnlyClassIsALogicError(): void
     {
-        $this->expectException(LogicException::class);
+        $exception = $this->logicError('untrusted', ['text' => 'abc']);
 
-        $this->post('untrusted', ['text' => 'abc']);
+        self::assertStringStartsWith('The value-object validation rule parameter names a class that cannot be validated from input', $exception->getMessage());
+        self::assertNull($exception->getPrevious());
     }
 
     public function testAWildcardFieldIsALogicError(): void
     {
-        $this->expectException(LogicException::class);
-        $this->expectExceptionMessage('wildcard');
+        $exception = $this->logicError('wildcard', ['emails' => ['a@b.co']]);
 
-        $this->post('wildcard', ['emails' => ['a@b.co']]);
+        self::assertSame('The field "emails.*" contains a wildcard: read one concrete field at a time.', $exception->getMessage());
+        self::assertNull($exception->getPrevious());
+    }
+
+    public function testTheTraitHoldsOnlyItsDocumentedMethod(): void
+    {
+        $trait = new ReflectionClass(ValidatedValueObjects::class);
+
+        self::assertSame(['validatedValueObject'], array_map(static fn (ReflectionMethod $method): string => $method->getName(), $trait->getMethods()));
+        self::assertSame([], $trait->getProperties());
+        self::assertSame([], $trait->getReflectionConstants());
+    }
+
+    /**
+     * @param PostShape $post
+     */
+    private function logicError(string $action, array $post): LogicException
+    {
+        try {
+            $this->post($action, $post);
+        } catch (LogicException $e) {
+            self::assertSame(LogicException::class, $e::class);
+
+            return $e;
+        }
+
+        self::fail('A LogicException was expected.');
     }
 
     /**

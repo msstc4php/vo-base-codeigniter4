@@ -199,14 +199,16 @@ final class ValueObjectColumn
     {
         $class = self::className($parameter, 'validation rule');
         if (!self::mapper()->supportsUntrusted($class) || (!is_a($class, ValueObject::class, true) && !is_a($class, BackedEnum::class, true))) {
-            throw new LogicException(\sprintf('%s cannot be validated from input: it is not supported, or its payload carries its own constraints (BoundedString: check the length with min_length/max_length, or use NonEmptyString).', $class));
+            // The class is not named: a rule parameter built from a placeholder is the client's text.
+            throw new LogicException('The value-object validation rule parameter names a class that cannot be validated from input: it is not supported, or its payload carries its own constraints (BoundedString: check the length with min_length/max_length, or use NonEmptyString).');
         }
 
         return $class;
     }
 
     /**
-     * Checked before any class lookup, so a parameter built from a placeholder never reaches the autoloader.
+     * Checked before any class lookup, so a parameter built from a placeholder never reaches the autoloader. The
+     * message does not quote the parameter: a placeholder fills it from the submitted data.
      */
     private static function className(string $parameter, string $usage): string
     {
@@ -215,7 +217,7 @@ final class ValueObjectColumn
         }
 
         if (preg_match(self::CLASS_NAME, $parameter) !== 1) {
-            throw new LogicException(\sprintf('The value-object %s parameter "%s" is not a class name.', $usage, InvalidValueObjectException::excerpt($parameter)));
+            throw new LogicException(\sprintf('The value-object %s parameter is not a class name.', $usage));
         }
 
         // The codec lookup is keyed by the class name as ::class spells it, without a leading backslash.

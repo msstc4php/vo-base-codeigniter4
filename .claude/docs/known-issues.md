@@ -7,6 +7,10 @@ Every `codeigniter4/framework` release below 4.7.4 is covered by a Packagist sec
 them by default, so `--prefer-lowest` resolves to 4.7.4 and nothing older can be tested. The API we use exists
 since 4.5.0 (checked the 4.5.0 source: `Boot`, `DataCaster\Cast\BaseCast`, Entity on `DataCaster`), but 4.5.0 did
 not append the `nullable` param yet. Verified: 4.7.4 + PHPUnit 11.5 (lowest) and 4.7.6 + PHPUnit 13 (highest).
+Rechecked for 1.0 (2026-11-27 UTC): roave/security-advisories still conflicts with `<4.7.4` only, so 4.7.4 stays
+installable and the floor stays; from 1.0 raising it needs 2.0 (README "Versions"), so a future advisory batch that
+blocks 4.7.4 turns the lowest job red without a way out in a minor. vo-base floor is ^1.4 (O1); the lowest job is the
+only place 1.4.0 is resolved (the local profile is a path repository).
 
 ## Test bootstrap
 
@@ -42,8 +46,15 @@ test fixture sets `$castHandlers` in `initialize()` instead (it runs before `cre
 
 ## Custom codecs
 
-The cast handlers are static, so the mapper is built with the core's codecs only. A user composite with its own
-`PayloadCodec` is unsupported (`LogicException`) in 0.1.0.
+Since 0.3.0 the casts, the rule, the binder and validated data use the `valueobjectmapper` service when one is
+defined (see "Mapper service name is lowercase"); without it, the core's codecs only. A `ProvidesCodecs` set goes in
+as `new ValueObjectMapper(Codecs::all())` in that service (`tests/Integration/ProvidesCodecsTest`).
+
+## Worker mode (CodeIgniter 4.7 + FrankenPHP)
+
+`ValueObjectColumn`'s static fallback mapper and its per-parameter class caches (`$castClasses`, `$inputClasses`)
+live as long as the worker process, not the request. README says to define the service at boot. A mapper swapped
+mid-process must support the same classes (the cache does not re-check).
 
 ## Core strictness (vo-base 72d0fc5)
 
@@ -60,7 +71,10 @@ The core's exceptions extend `InvalidArgumentException`, which PHP derives from 
 
 CodeIgniter fills `{field}` placeholders in rule parameters from the submitted data
 (`valid_value_object[{type}]` with `type=..\Evil` reaches the rule as `..\Evil`). The FQCN regex in
-`ValueObjectColumn::className()` refuses it before any class lookup; `ValueObjectRulesTest` pins it.
+`ValueObjectColumn::className()` refuses it before any class lookup; `ValueObjectRulesTest` pins it. Since 1.0 the
+message quotes no part of the parameter (audit11 S1), and the "cannot be validated from input" message no longer
+names the class either: `valid_value_object[{type}]` with `type=App\Foo` passes the regex, so the class name would be
+the client's text. `testAPlaceholderThatNamesAClassIsNotQuotedEither` pins it.
 
 ## `@` is not a permitted URI character
 
@@ -104,3 +118,22 @@ element.
 `injectMock()` and `resetSingle()` but not in `Services::get()`/`override()`, so a camelCase name leaked a mocked
 mapper between tests. A service that is not a `ValueObjectMapper` is a `LogicException`; a missing one falls back to
 `new ValueObjectMapper()`.
+
+## 404 messages of the binder
+
+`ArgumentBinder` throws `PageNotFoundException::forPageNotFound()` everywhere (CodeIgniter's `HTTP.pageNotFound`,
+"Page Not Found", code 404, no previous). Until 0.3.0 the routability check used `forMethodNotFound($method)`,
+whose message names the method; a route such as `Users::$1` takes the method from the URL
+(`ControllerArgumentsTest::testAMethodTakenFromTheRouteIsNotEchoedIn404`). CodeIgniter hides 404 messages in
+production anyway, but the test harness's 404 override echoes them, which is how the tests see the text. The
+invalid-value 404 deliberately has no previous: `forPageNotFound()` takes no previous, and the mapper's exception
+quotes the segment.
+
+## Roave bc-check
+
+Exercised since v0.1.0; last green on 0c2f52a (2026-11-27T05:55Z UTC) against v0.3.0. Expected **green** on the
+1.0.0 commit as well: 1.0 changes no public signature and adds no `@internal` to an existing symbol (everything in
+`Internal\` was `@internal` already, and the traits and casts keep their methods); message texts are not checked.
+If it turns red, the report is real, not a 0.x-to-1.0 artefact. Not run locally (the VCS repository of vo-base needs
+GitHub authentication).
+

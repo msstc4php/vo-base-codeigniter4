@@ -82,7 +82,7 @@ final class ArgumentBinder
     private static function routable(Controller $controller, string $method): ReflectionMethod
     {
         if (!method_exists($controller, $method)) {
-            throw PageNotFoundException::forMethodNotFound($method);
+            throw PageNotFoundException::forPageNotFound();
         }
 
         $reflection = new ReflectionMethod($controller, $method);
@@ -92,7 +92,7 @@ final class ArgumentBinder
             || str_starts_with($reflection->getName(), '_')
             || method_exists(Controller::class, $method)
         ) {
-            throw PageNotFoundException::forMethodNotFound($method);
+            throw PageNotFoundException::forPageNotFound();
         }
 
         return $reflection;

@@ -21,7 +21,8 @@ Entity      DataCaster      Validation      Controller
 - **`Controller\ValueObjectArguments`** (trait, `_remap()`) over **`Internal\ArgumentBinder`**: reflects the target
   method, checks it is routable, converts positional route parameters typed with a scalar-backed class or enum
   through `fromUntrustedPayload()`. Supported-but-unbindable classes (`!supportsUntrusted()`, composites) are a
-  `LogicException`; invalid input a `PageNotFoundException`. Variadics stop the loop; union/intersection and
+  `LogicException`; invalid input and an unroutable method a `PageNotFoundException::forPageNotFound()` (generic
+  message, no previous; since 1.0 also for the method, see known-issues). Variadics stop the loop; union/intersection and
   unsupported types are untouched. Trailing absent nullable parameters without a default get `null`.
 - **`Controller\ValidatedValueObjects`** (trait, protected `validatedValueObject()`) over **`Internal\ValidatedData`**:
   `ArrayHelper::dotSearch()` on `$this->validator->getValidated()`, then `ValueObjectColumn::fromInput()`.
@@ -33,8 +34,10 @@ Entity      DataCaster      Validation      Controller
 ## Why static
 
 CodeIgniter calls cast handlers statically by class name (`$handler::get(...)`), so there is no instance to inject a
-mapper into. `ValueObjectColumn` keeps one lazily built `ValueObjectMapper` with the core's built-in codecs. Custom
-`PayloadCodec`s are therefore not pluggable in 0.1.0 (see known-issues).
+mapper into. Since 0.3.0 `ValueObjectColumn::mapper()` asks for the `valueobjectmapper` service (an app's
+`Config\Services::valueObjectMapper()`, `override()` or `injectMock()`), else keeps one lazily built
+`ValueObjectMapper` with the core's built-in codecs. The service is the only way to add codecs (no per-use override,
+no `codec_providers`-style config in 1.0: O6).
 
 ## Reading a stored value
 
@@ -43,6 +46,11 @@ everything else goes to the mapper as is. Bad JSON is an `InvalidPayloadExceptio
 previous. (Before core 8c795e1 this was try-then-retry; `isComposite()` replaced it.)
 
 ## Class checks
+
+Messages: none of the `LogicException`s on the input path (`untrustedTargetClass()`, used by the rule and by
+`ValidatedData`) quotes the parameter or the class, and the "not a class name" one quotes it for neither usage (1.0,
+O3): a `{field}` placeholder in a rule parameter is client data. The cast-only messages ("not a value object the cast
+supports", the extra-parameter one) still name the class/parameters: `$casts` is developer code.
 
 `targetClass()` / `untrustedTargetClass()` first match the parameter against an FQCN regex (ASCII letters, digits,
 `_` and bytes `\x80-\xff`, as PHP identifiers allow) (so nothing that is not a

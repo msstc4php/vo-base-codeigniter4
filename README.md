@@ -11,8 +11,8 @@ CodeIgniter 4 glue for [`msstc4php/vo-base`][core]: value objects in Entity and 
 Every conversion goes through the core's `Payload\ValueObjectMapper`, so a column written here reads back through
 the Doctrine types, the Laravel cast or the Cycle typecast.
 
-Requires PHP >= 8.4 and `codeigniter4/framework` ^4.7.4 (every earlier release carries a security advisory that
-Composer blocks by default).
+Requires PHP >= 8.4, `codeigniter4/framework` ^4.7.4 (every earlier release carries a security advisory that
+Composer blocks by default) and `msstc4php/vo-base` ^1.4.
 
 ## Install
 
@@ -25,7 +25,7 @@ Neither this package nor the core is on Packagist yet, so register both GitHub r
         { "type": "vcs", "url": "https://github.com/msstc4php/vo-base-codeigniter4" }
     ],
     "require": {
-        "msstc4php/vo-base-codeigniter4": "^0.3"
+        "msstc4php/vo-base-codeigniter4": "^1.0"
     }
 }
 ```
@@ -120,7 +120,8 @@ the rule for presence.
 
 The rule parameter must be a literal class name. Never put a `{field}` placeholder in it: CodeIgniter fills
 placeholders from the submitted data, which would let a client pick the class. A parameter that is not a class name
-is refused with a `LogicException` before any class lookup or autoload.
+is refused with a `LogicException` before any class lookup or autoload. Neither that message nor the one for a class
+the rule cannot validate quotes the parameter, since a placeholder would make it the client's text.
 
 Composites (`IntRange`, `GeoCoordinates`, `DateRange`) validate from JSON text or from an array with real types, as
 a JSON request body gives them. HTML form fields are always strings, so `range[min]=1&range[max]=5` fails for
@@ -160,7 +161,8 @@ $routes->get('users/(:segment)', 'Users::show/$1');
 ```
 
 A scalar-backed value object (`EmailAddress`, `Port`, `Uuid`, ...) or a backed enum is built from the segment; an
-invalid one answers 404 (`PageNotFoundException`) with CodeIgniter's own message, never a class name. A nullable
+invalid one answers 404 (`PageNotFoundException`) with CodeIgniter's generic message (`HTTP.pageNotFound`, "Page Not
+Found"), which names neither the class nor the segment. A nullable
 parameter whose segment is absent or `''` gets `null`; `''` for a non-nullable one is a 404, and so is a missing required (non-nullable, no default) value-object or enum
 parameter. A variadic parameter typed with a value object converts every element. Other types keep CodeIgniter's
 and PHP's behaviour (`int $id` still receives `'5'` as `5`); union and
@@ -178,7 +180,8 @@ Limitations of the trait:
   (`Config\Routing::$autoRoute = false`).
 - A controller with its own `_remap()` cannot use the trait.
 - `_remap()` switches CodeIgniter's own "method exists" check off, so the trait repeats it: a missing, non-public,
-  static, `_`-prefixed method or one declared by `CodeIgniter\Controller` is a 404.
+  static, `_`-prefixed method or one declared by `CodeIgniter\Controller` is a 404 with the same generic message (a
+  route such as `Users::$1` takes the method name from the URL, so it is not repeated).
 - CodeIgniter rejects `@` in URI segments unless `Config\App::$permittedURIChars` allows it (an email address in a
   path needs `@` added to it).
 
@@ -261,11 +264,76 @@ public static function valueObjectMapper(bool $getShared = true): ValueObjectMap
 it). Write the name in lowercase there: CodeIgniter lowercases it in `getSharedInstance()`, `injectMock()` and
 `resetSingle()` but not in `override()`; `Services::injectMock('valueobjectmapper', $mapper)` works too. A
 service that is not a `ValueObjectMapper` throws `LogicException`. A cast class is checked against the mapper once
-per process, the first time it is used, so a mapper swapped later must support the same classes.
+per process, the first time it is used, so a mapper swapped later must support the same classes. Under worker mode
+(CodeIgniter 4.7 with FrankenPHP) a process serves many requests: those checks and the fallback mapper (used when no
+service is defined) live as long as the worker, so define the service at boot, not per request.
 
 ## Limitations
 
 - One failure per field, as with every CodeIgniter rule.
+
+## Backward compatibility
+
+1.x follows semantic versioning; a breaking change needs 2.0. Covered by 1.x:
+
+- **Code API:** these classes and traits, with the methods below. None declares a constructor: CodeIgniter calls the
+  casts statically and builds the rule set without arguments.
+  - `Entity\ValueObjectCast`, the Entity cast handler, with CodeIgniter's static `get($value, array $params = [])` and
+    `set($value, array $params = [])`;
+  - `DataCaster\ValueObjectCast`, the Model field cast handler, with CodeIgniter's static
+    `get(mixed $value, array $params = [], ?object $helper = null)` and `set(...)` of the same parameters;
+  - `Validation\ValueObjectRules`, the rule set, with `valid_value_object(mixed $value, ?string $class = null): bool`;
+  - `Controller\ValueObjectArguments`, the controller trait, with `_remap(string $method, string ...$params)`;
+  - `Controller\ValidatedValueObjects`, the controller trait, with the protected
+    `validatedValueObject(string $field, string $class)`.
+
+  The traits hold only these methods. No 1.x release adds a method, property or constant to them: a method your
+  class declares would silently replace the trait's (or fail to compile if the signatures differ), a trait method
+  would silently replace one your class inherits, and a property or constant of the same name is a conflict.
+- **Names users write:** the cast syntax `vo[<class>]` and `?vo[<class>]` (the handler key, `vo` in the examples, is
+  yours), with the class as a fully qualified name, a leading backslash allowed, and null passing through the Entity
+  cast with or without `?`; the rule `valid_value_object[<class>]` in `Config\Validation::$ruleSets`; the service name
+  `valueObjectMapper`, which the casts, the rule, controller arguments and validated data look up as
+  `valueobjectmapper` (one plain mapper with the core's codecs without it); the argument binding: a positional route
+  parameter whose single named type is a scalar-backed value object or a backed enum (each element of a variadic
+  one), leaving union and intersection types and unsupported classes alone; dot keys in `validatedValueObject()`.
+- **Messages:** the rule's translation key `Validation.valid_value_object` with its `{field}` placeholder, and
+  CodeIgniter's `HTTP.pageNotFound` for the 404s of controller arguments. Changing a key or dropping the placeholder
+  needs 2.0; the wording of the English default is not covered.
+- **Data:** the stored formats above. They are vo-base's payload layer, the same as the Doctrine types and the other
+  bridges write, so a row written through one reads through another. Request input and route segments are read in the
+  same forms.
+- **Exceptions:**
+  - the casts' `get()` and `set()`: vo-base's `InvalidValueObjectException` or a subclass, unchanged, for an invalid
+    stored value or raw input, including vo-base's `InvalidPayloadException` for raw input of a trusted-source-only
+    class (`BoundedString`); `InvalidPayloadException` with the `JsonException` as previous for composite JSON text
+    that does not parse or a composite that cannot be encoded; `LogicException` with no previous for a missing,
+    extra or unsupported class parameter, or one that is not a class name;
+  - the rule returns `false` for invalid input and throws nothing for it; `LogicException` with no previous for a
+    missing parameter, one that is not a class name, or a class it cannot validate from input (unsupported, or
+    `BoundedString`), even for empty input;
+  - controller arguments: `CodeIgniter\Exceptions\PageNotFoundException` (404) with no previous for an invalid
+    segment or unknown enum case, `''` or a missing value for a non-nullable parameter, and a method that is not
+    routable; `LogicException` with no previous for a parameter typed with a composite or a trusted-source-only
+    class;
+  - `validatedValueObject()`: `LogicException` with no previous when no validation ran, for a `*` wildcard in the
+    field or a class it cannot build from input; `LogicException` with an `InvalidValueObjectException` as previous
+    (vo-base's own, or for composite JSON text the bridge's `InvalidPayloadException`) for a value that does not
+    convert;
+  - `LogicException` from every entry when the `valueObjectMapper` service is not a `ValueObjectMapper`.
+- **Enums:** the casts, the rule, controller arguments and validated data handle backed enums; an unknown case in a
+  route segment is a 404, like any invalid value.
+- **Versions:** a minor may add support for a new CodeIgniter or PHP major; dropping a supported CodeIgniter or PHP
+  version needs a major, and so does raising the floor of any third-party dependency (CodeIgniter, PHP). A minor may
+  raise the floor of a `msstc4php/*` package within its major (those follow the same promise).
+
+A minor never refuses a value an earlier 1.x accepted: the casts, the rule, controller arguments and validated data
+add no validation of their own, the value objects (vo-base and the domain packages) decide, and they follow the same
+rule.
+
+Not covered: exception message wording (the package's messages name classes, fields, cast or method parameters, never
+the value, and never quote the rule's parameter), except the translation keys above; anything marked `@internal`
+(`Internal\`).
 
 ## Development
 

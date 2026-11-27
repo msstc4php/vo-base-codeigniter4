@@ -24,7 +24,7 @@
     "require": {
         "php": ">=8.4",
         "codeigniter4/framework": "^4.7.4",
-        "msstc4php/vo-base": "^1.1"
+        "msstc4php/vo-base": "^1.4"
     },
     "require-dev": {
         "deptrac/deptrac": "^4.6",

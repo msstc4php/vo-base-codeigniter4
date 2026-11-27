@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MSSTC4PHP\ValueObject\CodeIgniter4\Tests\Unit\Internal;
 
 use BackedEnum;
+use Closure;
 use DateTimeImmutable;
 use JsonException;
 use LogicException;
@@ -44,18 +45,16 @@ final class ValueObjectColumnTest extends TestCase
 
     public function testTargetClassRejectsAnExtraParameter(): void
     {
-        $this->expectException(LogicException::class);
-        $this->expectExceptionMessage('one class parameter, "json, nullable2" given in addition');
+        $exception = $this->configurationError(static fn (): string => ValueObjectColumn::targetClass([Port::class, 'json', 'nullable', 'nullable2']));
 
-        ValueObjectColumn::targetClass([Port::class, 'json', 'nullable', 'nullable2']);
+        self::assertSame('The value-object cast takes one class parameter, "json, nullable2" given in addition.', $exception->getMessage());
     }
 
     public function testTargetClassRequiresAParameter(): void
     {
-        $this->expectException(LogicException::class);
-        $this->expectExceptionMessage('The value-object cast needs a class parameter.');
+        $exception = $this->configurationError(static fn (): string => ValueObjectColumn::targetClass([]));
 
-        ValueObjectColumn::targetClass([]);
+        self::assertSame('The value-object cast needs a class parameter.', $exception->getMessage());
     }
 
     /**
@@ -72,15 +71,14 @@ final class ValueObjectColumnTest extends TestCase
     #[DataProvider('unsupportedClasses')]
     public function testAnUnsupportedClassIsAProgrammerError(string $class): void
     {
-        $this->expectException(LogicException::class);
-        $this->expectExceptionMessage($class . ' is not a value object the cast supports');
+        $exception = $this->configurationError(static fn (): string => ValueObjectColumn::targetClass([$class]));
 
-        ValueObjectColumn::targetClass([$class]);
+        self::assertStringStartsWith($class . ' is not a value object the cast supports', $exception->getMessage());
     }
 
     public function testAnUnsupportedClassIsRefusedForInput(): void
     {
-        $this->expectExceptionMessage('stdClass cannot be validated from input');
+        $this->expectExceptionMessage('The value-object validation rule parameter names a class that cannot be validated from input');
 
         ValueObjectColumn::untrustedTargetClass(stdClass::class);
     }
@@ -297,8 +295,8 @@ final class ValueObjectColumnTest extends TestCase
             ValueObjectColumn::untrustedTargetClass($parameter);
             self::fail('A LogicException was expected.');
         } catch (LogicException $e) {
-            self::assertStringContainsString('parameter "', $e->getMessage());
-            self::assertStringContainsString('" is not a class name.', $e->getMessage());
+            self::assertSame('The value-object validation rule parameter is not a class name.', $e->getMessage());
+            self::assertNull($e->getPrevious());
         } finally {
             spl_autoload_unregister($probe);
         }
@@ -309,7 +307,7 @@ final class ValueObjectColumnTest extends TestCase
     public function testAnInvalidCastParameterIsRefusedToo(): void
     {
         $this->expectException(LogicException::class);
-        $this->expectExceptionMessage('The value-object cast parameter "{x}" is not a class name.');
+        $this->expectExceptionObject(new LogicException('The value-object cast parameter is not a class name.'));
 
         ValueObjectColumn::targetClass(['{x}']);
     }
@@ -364,5 +362,24 @@ final class ValueObjectColumnTest extends TestCase
 
             throw $e;
         }
+    }
+
+    /**
+     * A configuration error is a plain LogicException with no previous exception.
+     *
+     * @param Closure(): mixed $call
+     */
+    private function configurationError(Closure $call): LogicException
+    {
+        try {
+            $call();
+        } catch (LogicException $e) {
+            self::assertSame(LogicException::class, $e::class);
+            self::assertNull($e->getPrevious());
+
+            return $e;
+        }
+
+        self::fail('A LogicException was expected.');
     }
 }

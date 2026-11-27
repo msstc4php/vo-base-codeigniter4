@@ -55,9 +55,13 @@ final class MapperServiceTest extends TestCase
     {
         Services::override('valueobjectmapper', new stdClass());
 
-        $this->expectExceptionObject(new LogicException('The valueobjectmapper service is stdClass, not a ' . ValueObjectMapper::class . '.'));
-
-        ValueObjectColumn::mapper();
+        try {
+            ValueObjectColumn::mapper();
+            self::fail('A LogicException was expected.');
+        } catch (LogicException $e) {
+            self::assertSame('The valueobjectmapper service is stdClass, not a ' . ValueObjectMapper::class . '.', $e->getMessage());
+            self::assertNull($e->getPrevious());
+        }
     }
 
     public function testACastReachesTheServicesCodecs(): void

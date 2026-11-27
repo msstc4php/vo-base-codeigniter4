@@ -16,6 +16,8 @@ use PHPUnit\Framework\Attributes\CoversTrait;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\UsesClass;
 use PHPUnit\Framework\TestCase;
+use ReflectionClass;
+use ReflectionMethod;
 
 #[CoversTrait(ValueObjectArguments::class)]
 #[UsesClass(ArgumentBinder::class)]
@@ -30,12 +32,20 @@ final class ControllerArgumentsTest extends TestCase
         self::assertSame('email:jane@example.com', $response->getBody());
     }
 
-    public function testAnInvalidSegmentIs404WithoutAClassName(): void
+    public function testAnInvalidSegmentIs404WithoutAClassNameOrTheSegment(): void
     {
-        $response = $this->get('users/nope');
+        $response = $this->get('users/SeCrEt-7f3a');
 
         self::assertSame(404, $response->getStatusCode());
-        self::assertStringNotContainsString('MSSTC4PHP', (string) $response->getBody());
+        self::assertSame('Page Not Found', $response->getBody());
+    }
+
+    public function testAMethodTakenFromTheRouteIsNotEchoedIn404(): void
+    {
+        $response = $this->get('dynamic/SeCrEt7f3a');
+
+        self::assertSame(404, $response->getStatusCode());
+        self::assertSame('Page Not Found', $response->getBody());
     }
 
     public function testAnEnumSegmentBecomesTheCase(): void
@@ -48,7 +58,7 @@ final class ControllerArgumentsTest extends TestCase
         $response = $this->get('priority/9');
 
         self::assertSame(404, $response->getStatusCode());
-        self::assertStringNotContainsString('MSSTC4PHP', (string) $response->getBody());
+        self::assertSame('Page Not Found', $response->getBody());
     }
 
     public function testAnAbsentNullableParameterIsNull(): void
@@ -97,6 +107,15 @@ final class ControllerArgumentsTest extends TestCase
         self::assertSame('string:a@b.co', $this->get('union/a@b.co')->getBody());
     }
 
+    public function testTheTraitHoldsOnlyItsDocumentedMethod(): void
+    {
+        $trait = new ReflectionClass(ValueObjectArguments::class);
+
+        self::assertSame(['_remap'], array_map(static fn (ReflectionMethod $method): string => $method->getName(), $trait->getMethods()));
+        self::assertSame([], $trait->getProperties());
+        self::assertSame([], $trait->getReflectionConstants());
+    }
+
     public function testATrustedSourceOnlyClassIsAProgrammerError(): void
     {
         $this->expectException(LogicException::class);
@@ -134,6 +153,7 @@ final class ControllerArgumentsTest extends TestCase
             $routes->get('hidden', $controller . '::hidden');
             $routes->get('static', $controller . '::staticAction');
             $routes->get('missing', $controller . '::nope');
+            $routes->get('dynamic/(:segment)', $controller . '::$1');
         }, 'GET', $path);
     }
 }

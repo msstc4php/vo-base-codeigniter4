@@ -6,7 +6,10 @@ namespace MSSTC4PHP\ValueObject\CodeIgniter4\Tests\Support\Controller;
 
 use CodeIgniter\Controller;
 use MSSTC4PHP\ValueObject\CodeIgniter4\Controller\ValueObjectArguments;
+use MSSTC4PHP\ValueObject\CodeIgniter4\Tests\Support\Code;
+use MSSTC4PHP\ValueObject\CodeIgniter4\Tests\Support\Dimensions;
 use MSSTC4PHP\ValueObject\CodeIgniter4\Tests\Support\Priority;
+use MSSTC4PHP\ValueObject\CodeIgniter4\Tests\Support\ShortCode;
 use MSSTC4PHP\ValueObject\Identity\EmailAddress;
 use MSSTC4PHP\ValueObject\Primitive\BoundedString;
 use MSSTC4PHP\ValueObject\Temporal\DateRange;
@@ -96,6 +99,16 @@ final class UsersController extends Controller
     }
 
     public function composite(DateRange $range): string
+    {
+        return 'unreachable';
+    }
+
+    public function code(Code $code): string
+    {
+        return ($code instanceof ShortCode ? 'short:' : 'long:') . $code;
+    }
+
+    public function size(Dimensions $size): string
     {
         return 'unreachable';
     }

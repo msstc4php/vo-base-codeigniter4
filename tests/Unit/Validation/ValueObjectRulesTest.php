@@ -32,6 +32,8 @@ use stdClass;
 #[UsesClass(ValueObjectColumn::class)]
 final class ValueObjectRulesTest extends TestCase
 {
+    private const string UNSUPPORTED = 'The value-object validation rule parameter names a class that cannot be validated from input: it is not supported, or its payload carries its own constraints (BoundedString: check the length with min_length/max_length, or use NonEmptyString).';
+
     #[Override]
     public static function setUpBeforeClass(): void
     {
@@ -118,40 +120,53 @@ final class ValueObjectRulesTest extends TestCase
         $validation = $this->validation();
         $validation->setRules(['value' => 'valid_value_object[{type}]', 'type' => 'permit_empty']);
 
-        $this->expectException(LogicException::class);
-        $this->expectExceptionMessage('The value-object validation rule parameter "..\\\\Evil" is not a class name.');
+        try {
+            $validation->run(['value' => 'x', 'type' => '..\\SeCrEt-7f3a']);
+            self::fail('A LogicException was expected.');
+        } catch (LogicException $e) {
+            self::assertSame('The value-object validation rule parameter is not a class name.', $e->getMessage());
+            self::assertNull($e->getPrevious());
+        }
+    }
 
-        $validation->run(['value' => 'x', 'type' => '..\\Evil']);
+    public function testAPlaceholderThatNamesAClassIsNotQuotedEither(): void
+    {
+        $validation = $this->validation();
+        $validation->setRules(['value' => 'valid_value_object[{type}]', 'type' => 'permit_empty']);
+
+        try {
+            $validation->run(['value' => 'x', 'type' => 'App\\SeCrEt7f3a']);
+            self::fail('A LogicException was expected.');
+        } catch (LogicException $e) {
+            self::assertSame(self::UNSUPPORTED, $e->getMessage());
+            self::assertNull($e->getPrevious());
+        }
     }
 
     public function testAnUnsupportedClassIsAProgrammerError(): void
     {
-        $this->expectException(LogicException::class);
-        $this->expectExceptionMessage('stdClass cannot be validated from input');
+        $this->expectExceptionObject(new LogicException(self::UNSUPPORTED));
 
         new ValueObjectRules()->valid_value_object('x', stdClass::class);
     }
 
     public function testAnUnsupportedClassFailsEvenForEmptyInput(): void
     {
-        $this->expectException(LogicException::class);
-        $this->expectExceptionMessage('stdClass cannot be validated from input');
+        $this->expectExceptionObject(new LogicException(self::UNSUPPORTED));
 
         new ValueObjectRules()->valid_value_object(null, stdClass::class);
     }
 
     public function testBoundedStringIsRefusedBecauseTheClientWouldChooseTheBounds(): void
     {
-        $this->expectException(LogicException::class);
-        $this->expectExceptionMessage(BoundedString::class . ' cannot be validated from input: it is not supported, or its payload carries its own constraints (BoundedString: check the length with min_length/max_length, or use NonEmptyString).');
+        $this->expectExceptionObject(new LogicException(self::UNSUPPORTED));
 
         new ValueObjectRules()->valid_value_object('{"value":"x","minLength":0,"maxLength":null}', BoundedString::class);
     }
 
     public function testBoundedStringIsRefusedForEmptyInputToo(): void
     {
-        $this->expectException(LogicException::class);
-        $this->expectExceptionMessage(BoundedString::class . ' cannot be validated from input');
+        $this->expectExceptionObject(new LogicException(self::UNSUPPORTED));
 
         new ValueObjectRules()->valid_value_object('', '\\' . BoundedString::class);
     }

@@ -47,6 +47,9 @@
 - `AutoRouterImproved::checkRemap()` answers 404 for any controller with `_remap()`: explicit routes only (owner's
   decision). `PageNotFoundException` is code 404; in `display404errors()` CI rethrows it (message kept outside
   production) or uses the route's 404 override.
+- `PageNotFoundException::forMethodNotFound($method)` puts the method name in the message (`HTTP.methodNotFound`);
+  `forPageNotFound()` uses `HTTP.pageNotFound` ("Page Not Found") and takes no previous. The binder uses only the
+  latter. A route's method may be a back-reference (`Users::$1`), i.e. URL text.
 - Positional: `$params[i]` is parameter `i`; `(:segment)` never captures an empty string, so `''` only arrives when a
   caller passes it.
 

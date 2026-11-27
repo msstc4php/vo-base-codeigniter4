@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MSSTC4PHP\ValueObject\CodeIgniter4\Tests\Unit\Internal;
 
 use ArgumentCountError;
+use Closure;
 use CodeIgniter\Exceptions\PageNotFoundException;
 use LogicException;
 use MSSTC4PHP\ValueObject\CodeIgniter4\Controller\ValueObjectArguments;
@@ -13,6 +14,8 @@ use MSSTC4PHP\ValueObject\CodeIgniter4\Internal\ValueObjectColumn;
 use MSSTC4PHP\ValueObject\CodeIgniter4\Tests\Support\CodeIgniterApp;
 use MSSTC4PHP\ValueObject\CodeIgniter4\Tests\Support\Controller\OverridingController;
 use MSSTC4PHP\ValueObject\CodeIgniter4\Tests\Support\Controller\UsersController;
+use MSSTC4PHP\ValueObject\Exception\InvalidValueObjectException;
+use MSSTC4PHP\ValueObject\Identity\EmailAddress;
 use Override;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -38,16 +41,25 @@ final class ArgumentBinderTest extends TestCase
 
     public function testAnEmptySegmentIsInvalidForANonNullableParameter(): void
     {
-        $this->expectException(PageNotFoundException::class);
-
-        new UsersController()->_remap('show', '');
+        $this->assertNotFound(static fn (): mixed => new UsersController()->_remap('show', ''));
     }
 
     public function testAnAbsentRequiredValueObjectParameterIsNotFound(): void
     {
-        $this->expectException(PageNotFoundException::class);
+        $this->assertNotFound(static fn (): mixed => new UsersController()->_remap('show'));
+    }
 
-        new UsersController()->_remap('show');
+    public function testTheNotFoundCarriesNoPartOfTheSegmentWhileTheMappersOwnExceptionQuotesIt(): void
+    {
+        $exception = $this->assertNotFound(static fn (): mixed => new UsersController()->_remap('show', 'SeCrEt-7f3a'));
+
+        self::assertStringNotContainsString('SeCrEt-7f3a', $exception->getMessage());
+        try {
+            ValueObjectColumn::mapper()->fromUntrustedPayload(EmailAddress::class, 'SeCrEt-7f3a');
+            self::fail('An InvalidValueObjectException was expected.');
+        } catch (InvalidValueObjectException $cause) {
+            self::assertStringContainsString('SeCrEt-7f3a', $cause->getMessage());
+        }
     }
 
     public function testASurplusSegmentIsPassedThrough(): void
@@ -63,9 +75,9 @@ final class ArgumentBinderTest extends TestCase
     #[DataProvider('unroutableMethods')]
     public function testAnUnroutableMethodIsNotFound(string $method): void
     {
-        $this->expectException(PageNotFoundException::class);
+        $exception = $this->assertNotFound(static fn (): mixed => new UsersController()->_remap($method));
 
-        new UsersController()->_remap($method);
+        self::assertStringNotContainsString($method, $exception->getMessage());
     }
 
     /**
@@ -134,17 +146,18 @@ final class ArgumentBinderTest extends TestCase
 
     public function testAnInvalidVariadicElementIsNotFound(): void
     {
-        $this->expectException(PageNotFoundException::class);
-
-        new UsersController()->_remap('emails', 'a@b.co', 'nope');
+        $this->assertNotFound(static fn (): mixed => new UsersController()->_remap('emails', 'a@b.co', 'nope'));
     }
 
     public function testAnUnbindableVariadicTypeIsAProgrammerError(): void
     {
-        $this->expectException(LogicException::class);
-        $this->expectExceptionMessage('$texts');
-
-        new UsersController()->_remap('boundedVariadic', 'abc');
+        try {
+            new UsersController()->_remap('boundedVariadic', 'abc');
+            self::fail('A LogicException was expected.');
+        } catch (LogicException $e) {
+            self::assertSame(\sprintf('Parameter $texts of %s::boundedVariadic() cannot be bound from the route: its payload carries its own constraints, so a URL segment would choose them.', UsersController::class), $e->getMessage());
+            self::assertNull($e->getPrevious());
+        }
     }
 
     public function testAnUnbindableParameterIsFoundWhateverTheRequestCarries(): void
@@ -158,5 +171,25 @@ final class ArgumentBinderTest extends TestCase
     public function testAScalarParameterKeepsPhpWeakModeCoercion(): void
     {
         self::assertSame('int:5', new UsersController()->_remap('intId', '5'));
+    }
+
+    /**
+     * CodeIgniter's generic 404, with no previous exception: the message names neither the method nor the segment.
+     *
+     * @param Closure(): mixed $call
+     */
+    private function assertNotFound(Closure $call): PageNotFoundException
+    {
+        try {
+            $call();
+        } catch (PageNotFoundException $e) {
+            self::assertSame('Page Not Found', $e->getMessage());
+            self::assertSame(404, $e->getCode());
+            self::assertNull($e->getPrevious());
+
+            return $e;
+        }
+
+        self::fail('A PageNotFoundException was expected.');
     }
 }
